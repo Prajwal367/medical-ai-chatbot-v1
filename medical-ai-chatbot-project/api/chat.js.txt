@@ -1,0 +1,81 @@
+/**
+ * Secure Backend Proxy for Gemini API
+ * This file is designed to run as a serverless function (e.g., on Vercel or Netlify).
+ * It securely hides your GEMINI_API_KEY using environment variables.
+ */
+
+// We use the same model as in the frontend for consistency and power.
+const MODEL_NAME = "gemini-2.5-flash-preview-05-20";
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
+
+// Environment variable MUST be set on your hosting platform (e.g., Vercel/Netlify)
+const API_KEY = process.env.GEMINI_API_KEY;
+
+// System instruction to enforce safety and persona (a non-doctor health assistant)
+const systemPrompt = "You are a cautious and helpful AI health assistant for educational purposes only. You are NOT a medical doctor. Start every single response with the strong warning: '🛑 **I am an AI and not a doctor. Please consult a qualified healthcare professional for medical advice.**'. Keep your answers brief, factual, and easy to understand.";
+
+// This function handles incoming requests from your index.html
+module.exports = async (req, res) => {
+    // Set headers for CORS (Cross-Origin Resource Sharing) to allow your frontend to talk to this backend
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle preflight requests (OPTIONS)
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    // Check if the API Key is set
+    if (!API_KEY) {
+        res.status(500).json({ error: "Server Error: GEMINI_API_KEY environment variable is not set." });
+        return;
+    }
+
+    // Ensure we are handling a POST request
+    if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method Not Allowed' });
+        return;
+    }
+
+    try {
+        // Parse the JSON body sent from the frontend
+        const { prompt, chatHistory } = req.body;
+        
+        // Construct the contents array for the Gemini API payload
+        const contents = chatHistory || [];
+        contents.push({ role: "user", parts: [{ text: prompt }] });
+
+        const payload = {
+            contents: contents,
+            tools: [{ "google_search": {} }],
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            },
+        };
+
+        // Make the secure fetch call to the Gemini API
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-API-Key': API_KEY // Use the secure key here!
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Success: Send the response back to your frontend
+            res.status(200).json(result);
+        } else {
+            // API Error: Pass the error back
+            res.status(response.status).json(result);
+        }
+
+    } catch (error) {
+        console.error("Backend Proxy Error:", error);
+        res.status(500).json({ error: "Internal Server Error during API call." });
+    }
+};
