@@ -13,11 +13,14 @@ const INITIAL_DELAY = 1000; // 1 second
 
 // Function to handle the search and fetch with retries
 async function fetchWikipediaSummary(topic) {
+    // NEW: Augment the topic to force a medical search result
+    const augmentedTopic = `${topic} medical condition OR human disease`;
+
     // 1. Search for the topic to get a page title
     const searchParams = new URLSearchParams({
         action: 'query',
         list: 'search',
-        srsearch: topic,
+        srsearch: augmentedTopic, // Use the augmented topic here
         format: 'json',
         srlimit: 1 // Only need the top result
     });
@@ -66,7 +69,12 @@ async function fetchWikipediaSummary(topic) {
     }
 
     // 3. Clean up the extract and create the source URL
-    const cleanedExtract = extract.split('\n')[0]; // Take only the first paragraph for a concise summary
+    // We also remove any "may refer to" sentences that show up in disambiguation pages
+    let cleanedExtract = extract.split('\n')[0]; 
+    if (cleanedExtract.includes("may refer to:")) {
+        cleanedExtract = "The topic is ambiguous, but here is the primary medical summary:";
+    }
+
     const sourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
 
     return {
