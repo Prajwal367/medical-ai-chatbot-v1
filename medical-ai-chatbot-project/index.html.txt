@@ -79,6 +79,9 @@
                 "in", "at", "for", "with", "is", "got", "can you", "please"
             ];
 
+            // NEW: List of generic, high-level symptoms that should NOT have "disease" appended.
+            const GENERIC_SYMPTOMS = ["fever", "pain", "rash", "vomiting", "diarrhea", "nausea", "cough", "runny nose"];
+
             // NEW: Function to clean conversational phrases into search keywords
             const cleanPrompt = (prompt) => {
                 let cleaned = prompt.toLowerCase();
@@ -97,10 +100,14 @@
                 // 3. Trim extra spaces and join words with a single space
                 cleaned = cleaned.trim().replace(/\s\s+/g, ' ');
                 
-                // 4. CRITICAL FIX: If the cleaned prompt is just one word, append "disease" 
-                // to force a medical search and prevent historical/music results.
-                if (cleaned.split(' ').length === 1 && cleaned.length > 0) {
-                    cleaned = `${cleaned} disease`;
+                // 4. IMPROVED: Check if the cleaned prompt is a single word and is NOT a generic symptom.
+                const cleanedWords = cleaned.split(' ');
+                if (cleanedWords.length === 1 && cleanedWords[0].length > 0) {
+                    // If the single word is on our list of generic symptoms, we leave it alone.
+                    if (!GENERIC_SYMPTOMS.includes(cleanedWords[0])) {
+                        // Otherwise, we append "disease" to force a medical context.
+                        cleaned = `${cleaned} disease`;
+                    }
                 }
 
                 return cleaned;
