@@ -11,30 +11,55 @@ const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
 const MAX_RETRIES = 3;
 const INITIAL_DELAY = 1000; // 1 second
 
-// Function to handle the search and fetch with retries
-async function fetchWikipediaSummary(topic) {
-    // NEW: Augment the topic to force a medical search result
-    const augmentedTopic = `${topic} medical condition OR human disease`;
-
-    // 1. Search for the topic to get a page title
+/**
+ * Executes a Wikipedia search and returns the top article title.
+ * @param {string} searchTerm The term to search for.
+ * @returns {Promise<string|null>} The article title or null if none found.
+ */
+async function searchWikipedia(searchTerm) {
     const searchParams = new URLSearchParams({
         action: 'query',
         list: 'search',
-        srsearch: augmentedTopic, // Use the augmented topic here
+        srsearch: searchTerm, 
         format: 'json',
         srlimit: 1 // Only need the top result
     });
 
-    let searchResult;
     try {
         const searchResponse = await fetch(`${WIKIPEDIA_API_URL}?${searchParams.toString()}`, { method: 'GET' });
-        searchResult = await searchResponse.json();
+        const searchResult = await searchResponse.json();
+        return searchResult.query?.search?.[0]?.title || null;
     } catch (e) {
         console.error("Wikipedia Search Failed:", e);
-        return { error: "Search failed due to network issue." };
+        throw new Error("Search failed due to network issue.");
+    }
+}
+
+
+// Function to handle the search and fetch with retries
+async function fetchWikipediaSummary(topic) {
+    let title = null;
+    
+    // --- NEW TWO-STEP SEARCH STRATEGY ---
+    
+    // 1. Attempt to find the exact, primary article title first (e.g., search "Fever" to get "Fever")
+    try {
+        title = await searchWikipedia(topic);
+    } catch (e) {
+        return { error: e.message };
     }
 
-    const title = searchResult.query?.search?.[0]?.title;
+    // 2. If no title found in step 1, use the augmented medical keywords as a fallback
+    if (!title) {
+        const augmentedTopic = `${topic} medical condition OR human disease`;
+        try {
+            title = await searchWikipedia(augmentedTopic);
+        } catch (e) {
+            return { error: e.message };
+        }
+    }
+    
+    // --- END NEW SEARCH STRATEGY ---
 
     if (!title) {
         return { error: "No matching Wikipedia article found." };
