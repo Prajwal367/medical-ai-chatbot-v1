@@ -44,7 +44,7 @@
         <!-- Initial Welcome Message -->
         <div class="flex justify-start">
             <div class="ai-message p-3 max-w-xs md:max-w-md shadow">
-                Hello! I can provide general health facts and summaries from Wikipedia. What health topic or symptom would you like to research today?
+                Hello! I can provide general health facts and summaries from Wikipedia. **How may I assist you with a health topic today?**
             </div>
         </div>
     </div>
@@ -72,7 +72,20 @@
             const userInput = document.getElementById('user-input');
             const sendButton = document.getElementById('send-button');
 
-            // NOTE: chatHistory is NO LONGER USED in this 100% free version.
+            // Simple local response checker
+            const getLocalResponse = (prompt) => {
+                const lowerPrompt = prompt.toLowerCase();
+                if (lowerPrompt.includes('hi') || lowerPrompt.includes('hello') || lowerPrompt.includes('hey')) {
+                    return "Hello! I'm here to help you find facts about health and diseases from reliable sources like Wikipedia. What topic can I search for?";
+                }
+                if (lowerPrompt.includes('thank') || lowerPrompt.includes('thanks')) {
+                    return "You're welcome! Feel free to ask if you have any other questions.";
+                }
+                if (lowerPrompt.length < 5) {
+                    return "I'm sorry, I need a specific health term or question to search Wikipedia. Can you please be more detailed?";
+                }
+                return null; // Must search the API
+            };
 
             // Function to add a message to the chat
             const addMessage = (text, type) => {
@@ -127,7 +140,21 @@
                 addMessage(prompt, 'user');
                 userInput.value = '';
                 sendButton.disabled = true;
+
+                // --- NEW CONVERSATIONAL LOGIC ---
+                const localResponse = getLocalResponse(prompt);
+
+                if (localResponse) {
+                    // Respond immediately without calling Vercel API
+                    sendButton.disabled = false;
+                    setTimeout(() => addMessage(localResponse, 'ai'), 200); // Small delay for better UX
+                    return; 
+                }
+                // ---------------------------------
+                
+                // If no local response, proceed to API search
                 addLoadingIndicator();
+
 
                 try {
                     // This now calls the Wikipedia API proxy
@@ -141,7 +168,6 @@
                     sendButton.disabled = false;
 
                     if (!response.ok) {
-                        // Handle server errors (e.g., API key missing, but here it's connection failure)
                         const errorData = await response.json();
                         addMessage(`An error occurred: ${errorData.message || 'Could not reach fact finder server.'}`, 'ai');
                         return;
@@ -150,7 +176,8 @@
                     const data = await response.json();
                     
                     if (data.error) {
-                         addMessage(`I'm sorry, I couldn't find a good summary for **"${prompt}"**. Please try a different or more specific health term.`, 'ai');
+                         // The error message comes from the backend if a search fails
+                         addMessage(`I'm sorry, I couldn't find a good health summary for **"${prompt}"**. Please try a different or more specific medical term.`, 'ai');
                     } else {
                         // Success: data.summary and data.sourceUrl
                         const messageText = `
