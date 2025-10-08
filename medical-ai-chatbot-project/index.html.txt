@@ -75,9 +75,11 @@
             const sendButton = document.getElementById('send-button');
 
             // --- Groq API Configuration ---
-            // The API key is now retrieved from a global environment variable (or is null if not set)
-            // You must set GROQ_API_KEY_ENV in your deployment environment (e.g., Vercel)
-            const GROQ_API_KEY = typeof GROQ_API_KEY_ENV !== 'undefined' ? GROQ_API_KEY_ENV : null;
+            // IMPORTANT FIX: For static files hosted on platforms like Vercel/Netlify, 
+            // the environment variable must be explicitly injected into the build. 
+            // We use a safe placeholder, which your hosting platform must replace.
+            const GROQ_API_KEY = "GROQ_API_KEY_ENV_PLACEHOLDER"; 
+            
             const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
             const GROQ_MODEL = "llama3-8b-8192";
 
@@ -133,8 +135,9 @@
                 e.preventDefault();
                 const prompt = userInput.value.trim();
 
-                if (!GROQ_API_KEY) {
-                    addMessage("Error: The Groq API key is missing. Please set the GROQ_API_KEY_ENV environment variable in your hosting platform.", 'ai');
+                // Check for the placeholder value after the build step replacement
+                if (GROQ_API_KEY === "GROQ_API_KEY_ENV_PLACEHOLDER" || !GROQ_API_KEY) {
+                    addMessage("Error: The Groq API key is missing. Please ensure the GROQ_API_KEY_ENV variable is correctly set and inlined during your deployment build.", 'ai');
                     return;
                 }
 
@@ -169,6 +172,7 @@
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
+                            // Use the injected key here
                             'Authorization': `Bearer ${GROQ_API_KEY}`
                         },
                         body: JSON.stringify(payload)
@@ -178,9 +182,9 @@
                     sendButton.disabled = false;
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        addMessage(`An error occurred: ${errorData.error?.message || 'Could not connect to the Groq API. Check the console for details.'}`, 'ai');
-                        console.error('Groq API Error:', errorData);
+                        const errorData = await response.json().catch(() => ({})); // Handle non-JSON errors
+                        addMessage(`An API error occurred: ${response.status} - ${errorData.error?.message || 'Check the console for details.'}`, 'ai');
+                        console.error('Groq API Error:', errorData, response);
                         return;
                     }
 
