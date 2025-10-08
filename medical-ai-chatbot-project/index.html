@@ -75,10 +75,18 @@
             const sendButton = document.getElementById('send-button');
 
             // --- Groq API Configuration ---
-            // IMPORTANT FIX: For static files hosted on platforms like Vercel/Netlify, 
-            // the environment variable must be explicitly injected into the build. 
-            // We use a safe placeholder, which your hosting platform must replace.
-            const GROQ_API_KEY = "GROQ_API_KEY_ENV_PLACEHOLDER"; 
+            // IMPORTANT FIX: Using VITE_ prefix for reliable Vercel injection into static files.
+            let GROQ_API_KEY = "VITE_GROQ_API_KEY_PLACEHOLDER"; 
+            
+            // Check if the injection failed and the placeholder is still present
+            if (GROQ_API_KEY === "VITE_GROQ_API_KEY_PLACEHOLDER" || !GROQ_API_KEY.trim()) {
+                console.error("Critical: API key injection failed. The placeholder is still present or the key is empty.");
+                GROQ_API_KEY = null; // Set to null to trigger error in app
+            } else {
+                 // Trim whitespace just in case the build command added some
+                GROQ_API_KEY = GROQ_API_KEY.trim();
+            }
+
             
             const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
             const GROQ_MODEL = "llama3-8b-8192";
@@ -135,9 +143,9 @@
                 e.preventDefault();
                 const prompt = userInput.value.trim();
 
-                // Check for the placeholder value after the build step replacement
-                if (GROQ_API_KEY === "GROQ_API_KEY_ENV_PLACEHOLDER" || !GROQ_API_KEY) {
-                    addMessage("Error: The Groq API key is missing. Please ensure the GROQ_API_KEY_ENV variable is correctly set and inlined during your deployment build.", 'ai');
+                // Check for the API key value (will be null if injection failed)
+                if (!GROQ_API_KEY) {
+                    addMessage("Error: The Groq API key is missing. Please ensure the VITE_GROQ_API_KEY environment variable is correctly set and the build command is running the injection script.", 'ai');
                     return;
                 }
 
@@ -183,7 +191,18 @@
 
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({})); // Handle non-JSON errors
-                        addMessage(`An API error occurred: ${response.status} - ${errorData.error?.message || 'Check the console for details.'}`, 'ai');
+                        
+                        let errorMessage = `An API error occurred: ${response.status}.`;
+                        if (errorData.error?.message) {
+                            // Check for common 401 Unauthorized error specifically
+                            if (response.status === 401 || response.status === 403) {
+                                errorMessage += " The API key is likely incorrect or expired (Status 401/403). Please verify the VITE_GROQ_API_KEY value.";
+                            } else {
+                                errorMessage += ` Groq Message: ${errorData.error.message}`;
+                            }
+                        }
+                        
+                        addMessage(errorMessage, 'ai');
                         console.error('Groq API Error:', errorData, response);
                         return;
                     }
