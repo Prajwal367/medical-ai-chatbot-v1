@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Health Assistant (Groq Chatbot)</title>
+    <title>AI Health Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -29,7 +29,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16M12 4v16" />
             </svg>
-            AI Health Assistant (Groq Chatbot)
+            AI Health Assistant
         </h1>
         <p class="text-sm text-gray-500">Fast Text-Only Project | [Your Name]</p>
     </header>
@@ -44,7 +44,7 @@
         <!-- Initial Welcome Message -->
         <div class="flex justify-start">
             <div class="ai-message p-3 max-w-xs md:max-w-md shadow">
-                Hello! I am an **AI Health Assistant** powered by Groq. I can provide fast, concise facts on health topics. **How may I assist you today?**
+                Hello! I am an **AI Health Assistant**. I can provide fast, concise facts on health topics. **How may I assist you today?**
             </div>
         </div>
     </div>
@@ -75,13 +75,23 @@
             const sendButton = document.getElementById('send-button');
 
             // --- Groq API Configuration ---
-            // IMPORTANT FIX: Using VITE_ prefix for reliable Vercel injection into static files.
-            let GROQ_API_KEY = "VITE_GROQ_API_KEY_PLACEHOLDER"; 
+            // IMPORTANT: Using a generic placeholder for deployment simplicity.
+            // On Netlify, this will be replaced using a simple build command.
+            let GROQ_API_KEY = "NETLIFY_KEY_PLACEHOLDER"; 
             
             // Check if the injection failed and the placeholder is still present
-            if (GROQ_API_KEY === "VITE_GROQ_API_KEY_PLACEHOLDER" || !GROQ_API_KEY.trim()) {
+            if (GROQ_API_KEY === "NETLIFY_KEY_PLACEHOLDER" || !GROQ_API_KEY.trim()) {
                 console.error("Critical: API key injection failed. The placeholder is still present or the key is empty.");
-                GROQ_API_KEY = null; // Set to null to trigger error in app
+                // Update error message to be deployment agnostic
+                const errorMessage = "Error: The Groq API key is missing. Please ensure your hosting platform has successfully injected the 'GROQ_API_KEY' environment variable during the build process.";
+                
+                // Only show this error if the user tries to submit a request
+                document.getElementById('chat-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    addMessage(errorMessage, 'ai');
+                }, { once: true });
+                
+                GROQ_API_KEY = null; 
             } else {
                  // Trim whitespace just in case the build command added some
                 GROQ_API_KEY = GROQ_API_KEY.trim();
@@ -145,7 +155,8 @@
 
                 // Check for the API key value (will be null if injection failed)
                 if (!GROQ_API_KEY) {
-                    addMessage("Error: The Groq API key is missing. Please ensure the VITE_GROQ_API_KEY environment variable is correctly set and the build command is running the injection script.", 'ai');
+                    // Fallback error, should not be hit if the event listener above is active, but is safe.
+                    addMessage("Error: The Groq API key is missing. Please ensure your hosting platform has successfully injected the 'GROQ_API_KEY' environment variable during the build process.", 'ai');
                     return;
                 }
 
@@ -196,7 +207,7 @@
                         if (errorData.error?.message) {
                             // Check for common 401 Unauthorized error specifically
                             if (response.status === 401 || response.status === 403) {
-                                errorMessage += " The API key is likely incorrect or expired (Status 401/403). Please verify the VITE_GROQ_API_KEY value.";
+                                errorMessage += " The API key is likely incorrect or expired (Status 401/403). Please verify the GROQ_API_KEY value is correct and active.";
                             } else {
                                 errorMessage += ` Groq Message: ${errorData.error.message}`;
                             }
