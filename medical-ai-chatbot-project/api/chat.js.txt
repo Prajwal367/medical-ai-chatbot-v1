@@ -19,6 +19,16 @@ if (!API_KEY) {
  * @param {object} res - The Vercel/Node.js response object.
  */
 module.exports = async (req, res) => {
+    // Set CORS headers to allow communication from the frontend
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -34,7 +44,8 @@ module.exports = async (req, res) => {
     const payload = {
         model: GROQ_MODEL,
         messages: [
-            { role: "system", content: systemInstruction.parts[0].text },
+            // Ensure systemInstruction is handled gracefully if the parts structure isn't exactly as expected
+            { role: "system", content: (systemInstruction && systemInstruction.parts && systemInstruction.parts[0] && systemInstruction.parts[0].text) || "You are a helpful assistant." },
             { role: "user", content: prompt }
         ],
         temperature: 0.7,
