@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Health Assistant (Text-Only)</title>
+    <!-- Load Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        /* Set body to full viewport height to enable responsive sizing */
+        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; height: 100vh; margin: 0; }
+        
+        .chat-container {
+            /* Scrollable area for messages */
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+        /* User message style (deep blue background) */
+        .user-message {
+            background-color: #2563eb; /* Blue-600 */
+            color: white;
+            border-radius: 1rem 1rem 0.2rem 1rem;
+        }
+        /* UPDATED: Light Blue/Cyan Theme for AI messages to match screenshot */
+        .ai-message {
+            background-color: #f0f9ff; /* Lightest blue (sky-50) or #f0f9ff (blue-50) for a softer look */
+            color: #1e40af; /* Darker blue text (blue-800) */
+            border-radius: 1rem 1rem 1rem 0.2rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            border: 1px solid #bfdbfe; /* Light blue border */
+        }
+        /* Custom scrollbar for better aesthetics */
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #93c5fd; /* blue-300 */
+            border-radius: 10px;
+        }
+        /* UPDATED: Blue theme for loading dots */
+        .loading-dot {
+            animation: bounce 1.4s infinite ease-in-out both;
+            background-color: #2563eb; /* Blue-600 */
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+    </style>
+</head>
+<!-- h-screen on body ensures the main container can take up the full height -->
+<body class="p-4 sm:p-6 flex flex-col items-center h-screen">
+
+    <!-- Main Application Container -->
+    <!-- h-full ensures it fits within the body's height -->
+    <div class="w-full max-w-2xl bg-white shadow-xl rounded-2xl overflow-hidden flex flex-col h-full max-h-full">
+
+        <!-- Header (UPDATED to match screenshot) -->
+        <header class="p-4 bg-white border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
+                <!-- UPDATED: Blue Icon -->
+                <svg class="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2l4-4m6 2a9 0 11-18 0a9 0 0118 0z"></path></svg>
+                AI Health Assistant
+            </h1>
+            <!-- Added project name/user name text -->
+            <p class="text-xs text-gray-500 font-medium">Fast Text-Only Project | [Your Name]</p>
+            <!-- User ID display removed to match screenshot -->
+        </header>
+
+        <!-- CRITICAL Medical Disclaimer (UPDATED to match screenshot style/content) -->
+        <div id="initial-disclaimer" class="p-3 bg-orange-400 text-white text-xs font-medium border-b border-orange-600 flex-shrink-0">
+            <span class="font-bold">⚠️ MANDATORY WARNING:</span> This tool uses AI and is for informational purposes only. It is **NOT** medical advice. Always consult a qualified doctor.
+        </div>
+        
+        <!-- Chat History Container (flex-grow) -->
+        <div id="chat-container" class="chat-container flex-grow p-4 space-y-4">
+            <!-- Initial Chat message (UPDATED to match screenshot text style) -->
+            <div class="flex justify-start">
+                <div class="ai-message p-3 max-w-[85%] sm:max-w-[70%] text-sm">
+                    Hello! I am an ***AI Health Assistant***. I can provide fast, concise facts on health topics. ***How may I assist you today?***
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area (flex-shrink-0) -->
+        <div class="p-4 border-t border-gray-200 bg-white shadow-lg flex-shrink-0">
+            <div id="loading-indicator" class="hidden text-center mb-2">
+                <div class="text-sm text-blue-600 flex justify-center items-center">
+                    <span class="loading-dot"></span>
+                    <span class="loading-dot"></span>
+                    <span class="loading-dot"></span>
+                    <span class="ml-2">Thinking...</span>
+                </div>
+            </div>
+
+            <!-- Chat Input (UPDATED styles) -->
+            <div class="flex gap-3">
+                <input
+                    type="text"
+                    id="user-input"
+                    class="flex-grow p-4 border border-gray-300 rounded-2xl text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition duration-150"
+                    placeholder="Ask a health question..."
+                    onkeydown="if(event.key === 'Enter') document.getElementById('send-button').click()"
+                >
+                <button
+                    id="send-button"
+                    onclick="sendMessage()"
+                    class="bg-blue-600 text-white w-12 h-12 sm:w-16 sm:h-16 rounded-full hover:bg-blue-700 transition duration-150 shadow-xl disabled:bg-gray-400 flex items-center justify-center flex-shrink-0"
+                    disabled
+                >
+                    <!-- UPDATED: Simple arrow icon -->
+                    <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.33 2.667l13.793 8.324-13.793 8.324V2.667z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs and Main Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global state
+        let db;
+        let auth;
+        let userId = 'loading';
+        let isAuthReady = false;
+
+        // Configuration variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // --- API URL points to the secure local Groq proxy route ---
+        const GROQ_API_PROXY_URL = '/api/chat'; 
+
+        // System Instruction is crucial for defining the AI's persona and safety guidelines.
+        const CHAT_SYSTEM_INSTRUCTION = {
+            parts: [{ text: `You are a cautious and helpful health information assistant, *not* a doctor or medical professional. Your primary goal is to provide general, educational, and supportive information. You must start every response with a clear and prominent disclaimer in bold: '***Disclaimer: I am an AI assistant, not a doctor. This information is for educational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider for any medical concerns.***' Then, answer the user's question clearly, focusing on common knowledge, risk factors, and general prevention, avoiding definitive diagnoses or treatment plans.` }]
+        };
+
+        // DOM Elements
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatContainer = document.getElementById('chat-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         */
+        const setupFirebase = async () => {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing. Proceeding without persistent storage.");
+                isAuthReady = true;
+                userId = 'anonymous_local';
+                sendButton.disabled = false;
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    isAuthReady = true;
+                    sendButton.disabled = false;
+                    console.log("Firebase setup complete. User ID:", userId);
+                });
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+            } catch (error) {
+                console.error("Firebase authentication error:", error);
+                userId = 'auth_failed_' + crypto.randomUUID().substring(0, 8);
+                isAuthReady = true;
+                sendButton.disabled = false;
+            }
+        };
+
+        /**
+         * Renders a message bubble in the chat container.
+         * @param {string} content - The message text (can include markdown/HTML).
+         * @param {string} type - 'user' or 'ai'.
+         */
+        const renderMessage = (content, type) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', type === 'user' ? 'justify-end' : 'justify-start');
+
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('p-3', 'max-w-[90%]', 'sm:max-w-[70%]', 'text-sm', 'whitespace-pre-wrap');
+
+            if (type === 'user') {
+                contentDiv.classList.add('user-message');
+            } else if (type === 'ai') {
+                contentDiv.classList.add('ai-message');
+                // Simple markdown conversion for bolding
+                // Handles the *** bold/emphasis used in the system instruction
+                content = content.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+                // Handles the ** bold used in the welcome message
+                content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            }
+
+            contentDiv.innerHTML = content;
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll
+        };
+
+        /**
+         * Retries the API fetch with exponential backoff.
+         */
+        const fetchWithBackoff = async (url, payload) => {
+            const maxRetries = 5;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
+                        if (response.status === 429) { 
+                             throw new Error(`Rate limit exceeded (Attempt ${i + 1}).`);
+                        }
+                        throw new Error(`Proxy error: ${errorData.message || response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.text) {
+                        return result.text;
+                    } else {
+                        throw new Error("Proxy response was empty or malformed.");
+                    }
+
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed:`, error);
+                    if (i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + (Math.random() * 500); // 1s, 2s, 4s, 8s, 16s + jitter
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw new Error("API failed after multiple retries.");
+                    }
+                }
+            }
+        };
+
+        /**
+         * Main function to handle user input and get AI response.
+         */
+        window.sendMessage = async () => {
+            const prompt = userInput.value.trim();
+            if (!prompt) return;
+
+            renderMessage(prompt, 'user');
+
+            // Disable buttons and show loading
+            userInput.value = '';
+            sendButton.disabled = true;
+            userInput.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                // The proxy expects the user prompt and system instruction.
+                const payload = {
+                    prompt: prompt,
+                    systemInstruction: CHAT_SYSTEM_INSTRUCTION
+                };
+
+                const text = await fetchWithBackoff(GROQ_API_PROXY_URL, payload);
+                
+                renderMessage(text, 'ai');
+
+            } catch (error) {
+                console.error("Message sending failed:", error);
+                renderMessage("***Disclaimer: I am an AI assistant, not a doctor.*** I am sorry, but I was unable to retrieve a response at this time. (Error: " + error.message + ")", 'ai');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                sendButton.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        };
+
+        // Initialize the application on page load
+        window.onload = setupFirebase;
+    </script>
+</body>
+</html>
