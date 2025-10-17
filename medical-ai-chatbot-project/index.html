@@ -3,311 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Health Assistant (Text-Only)</title>
-    <!-- Load Tailwind CSS for modern, responsive styling -->
+    <title>AI Health Assistant Chatbot</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        /* Set body to full viewport height to enable responsive sizing */
-        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; height: 100vh; margin: 0; }
-        
-        .chat-container {
-            /* Scrollable area for messages */
-            overflow-y: auto;
-            scroll-behavior: smooth;
-        }
-        /* User message style (deep blue background) */
-        .user-message {
-            background-color: #2563eb; /* Blue-600 */
-            color: white;
-            border-radius: 1rem 1rem 0.2rem 1rem;
-        }
-        /* UPDATED: Light Blue/Cyan Theme for AI messages to match screenshot */
-        .ai-message {
-            background-color: #f0f9ff; /* Lightest blue (sky-50) or #f0f9ff (blue-50) for a softer look */
-            color: #1e40af; /* Darker blue text (blue-800) */
-            border-radius: 1rem 1rem 1rem 0.2rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #bfdbfe; /* Light blue border */
-        }
-        /* Custom scrollbar for better aesthetics */
-        .chat-container::-webkit-scrollbar {
+        /* Custom scrollbar styling for the chat window */
+        #chat-window::-webkit-scrollbar {
             width: 8px;
         }
-        .chat-container::-webkit-scrollbar-thumb {
-            background-color: #93c5fd; /* blue-300 */
-            border-radius: 10px;
+        #chat-window::-webkit-scrollbar-thumb {
+            background-color: #93c5fd; /* Light Blue/Cyan */
+            border-radius: 4px;
         }
-        /* UPDATED: Blue theme for loading dots */
-        .loading-dot {
-            animation: bounce 1.4s infinite ease-in-out both;
-            background-color: #2563eb; /* Blue-600 */
-            height: 8px;
-            width: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin: 0 2px;
-        }
-        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
-        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1.0); }
+        #chat-window::-webkit-scrollbar-track {
+            background: #eef2ff; /* Very light background */
         }
     </style>
 </head>
-<!-- h-screen on body ensures the main container can take up the full height -->
-<body class="p-4 sm:p-6 flex flex-col items-center h-screen">
+<body class="bg-gray-100 font-sans antialiased h-screen flex justify-center items-center p-4">
 
-    <!-- Main Application Container -->
-    <!-- h-full ensures it fits within the body's height -->
-    <div class="w-full max-w-2xl bg-white shadow-xl rounded-2xl overflow-hidden flex flex-col h-full max-h-full">
-
-        <!-- Header (UPDATED to match screenshot) -->
-        <header class="p-4 bg-white border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
-                <!-- UPDATED: Blue Icon -->
-                <svg class="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2l4-4m6 2a9 0 11-18 0a9 0 0118 0z"></path></svg>
+    <!-- Main Chat Container -->
+    <div class="flex flex-col bg-white shadow-2xl rounded-xl w-full max-w-lg h-full max-h-[90vh] overflow-hidden">
+        
+        <!-- Header -->
+        <header class="flex items-center justify-between p-4 bg-blue-700 text-white rounded-t-xl shadow-lg flex-shrink-0">
+            <h1 class="text-xl font-bold flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 AI Health Assistant
             </h1>
-            <!-- Added project name/user name text -->
-            <p class="text-xs text-gray-500 font-medium">Fast Text-Only Project | [Your Name]</p>
-            <!-- User ID display removed to match screenshot -->
+            <span class="text-sm font-light opacity-80">Fast Text-Only Project | [Your Name]</span>
         </header>
 
-        <!-- CRITICAL Medical Disclaimer (UPDATED to match screenshot style/content) -->
-        <div id="initial-disclaimer" class="p-3 bg-orange-400 text-white text-xs font-medium border-b border-orange-600 flex-shrink-0">
-            <span class="font-bold">⚠️ MANDATORY WARNING:</span> This tool uses AI and is for informational purposes only. It is **NOT** medical advice. Always consult a qualified doctor.
+        <!-- Mandatory Disclaimer -->
+        <div id="disclaimer" class="p-3 bg-orange-200 text-orange-800 text-xs font-medium border-l-4 border-orange-500 flex-shrink-0">
+            <span class="font-bold">MANDATORY WARNING:</span> This tool uses AI and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
         </div>
-        
-        <!-- Chat History Container (flex-grow) -->
-        <div id="chat-container" class="chat-container flex-grow p-4 space-y-4">
-            <!-- Initial Chat message (UPDATED to match screenshot text style) -->
+
+        <!-- Chat Window -->
+        <div id="chat-window" class="flex-grow p-4 space-y-4 overflow-y-auto bg-gray-50">
+            <!-- Initial AI Message -->
             <div class="flex justify-start">
-                <div class="ai-message p-3 max-w-[85%] sm:max-w-[70%] text-sm">
-                    Hello! I am an ***AI Health Assistant***. I can provide fast, concise facts on health topics. ***How may I assist you today?***
+                <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
+                    <p class="font-medium">Hello! I am an **AI Health Assistant** powered by Groq.</p>
+                    <p class="mt-1">I can provide fast, concise facts on health topics. ***How may I assist you today?***</p>
+                    <p class="mt-2 text-xs italic text-blue-700">**Remember: I am not a doctor.** Please start by asking a general health question (e.g., "What are common symptoms of seasonal allergies?" or "What are the benefits of walking?").</p>
                 </div>
             </div>
+            <!-- Messages will be injected here by JavaScript -->
         </div>
 
-        <!-- Input Area (flex-shrink-0) -->
-        <div class="p-4 border-t border-gray-200 bg-white shadow-lg flex-shrink-0">
-            <div id="loading-indicator" class="hidden text-center mb-2">
-                <div class="text-sm text-blue-600 flex justify-center items-center">
-                    <span class="loading-dot"></span>
-                    <span class="loading-dot"></span>
-                    <span class="loading-dot"></span>
-                    <span class="ml-2">Thinking...</span>
-                </div>
-            </div>
-
-            <!-- Chat Input (UPDATED styles) -->
-            <div class="flex gap-3">
-                <input
-                    type="text"
-                    id="user-input"
-                    class="flex-grow p-4 border border-gray-300 rounded-2xl text-base focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition duration-150"
-                    placeholder="Ask a health question..."
-                    onkeydown="if(event.key === 'Enter') document.getElementById('send-button').click()"
-                >
-                <button
-                    id="send-button"
-                    onclick="sendMessage()"
-                    class="bg-blue-600 text-white w-12 h-12 sm:w-16 sm:h-16 rounded-full hover:bg-blue-700 transition duration-150 shadow-xl disabled:bg-gray-400 flex items-center justify-center flex-shrink-0"
-                    disabled
-                >
-                    <!-- UPDATED: Simple arrow icon -->
-                    <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.33 2.667l13.793 8.324-13.793 8.324V2.667z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
+        <!-- Input Form -->
+        <form id="chat-form" class="flex p-4 bg-white border-t border-gray-200 flex-shrink-0">
+            <input 
+                type="text" 
+                id="user-input" 
+                placeholder="Ask a health question..." 
+                class="flex-grow p-3 border border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition duration-150 shadow-inner" 
+                required
+            />
+            <button 
+                type="submit" 
+                id="send-button"
+                class="ml-3 p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 00.183.189l4.577-3.66a1 1 0 01.98-.016l3.52 1.879 2.518-2.518-2.433-4.866a1 1 0 00-.73-1.025l-2.92-.73z" />
+                </svg>
+            </button>
+        </form>
     </div>
 
-    <!-- Firebase SDKs and Main Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global state
-        let db;
-        let auth;
-        let userId = 'loading';
-        let isAuthReady = false;
-
-        // Configuration variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // --- API URL points to the secure local Groq proxy route ---
-        const GROQ_API_PROXY_URL = '/api/chat'; 
-
-        // System Instruction is crucial for defining the AI's persona and safety guidelines.
-        const CHAT_SYSTEM_INSTRUCTION = {
-            parts: [{ text: `You are a cautious and helpful health information assistant, *not* a doctor or medical professional. Your primary goal is to provide general, educational, and supportive information. You must start every response with a clear and prominent disclaimer in bold: '***Disclaimer: I am an AI assistant, not a doctor. This information is for educational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider for any medical concerns.***' Then, answer the user's question clearly, focusing on common knowledge, risk factors, and general prevention, avoiding definitive diagnoses or treatment plans.` }]
-        };
-
-        // DOM Elements
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
-        const chatContainer = document.getElementById('chat-container');
-        const loadingIndicator = document.getElementById('loading-indicator');
 
-        /**
-         * Initializes Firebase and authenticates the user.
-         */
-        const setupFirebase = async () => {
-            if (!firebaseConfig) {
-                console.error("Firebase config is missing. Proceeding without persistent storage.");
-                isAuthReady = true;
-                userId = 'anonymous_local';
-                sendButton.disabled = false;
-                return;
-            }
+        // IMPORTANT FIX: Updated API path to Netlify Functions convention
+        const apiUrl = '/.netlify/functions/chat'; 
 
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+        // Utility to escape HTML for safe insertion (not strictly needed here, but good practice)
+        function escapeHTML(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
 
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                    isAuthReady = true;
-                    sendButton.disabled = false;
-                    console.log("Firebase setup complete. User ID:", userId);
-                });
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
+        // Add a new message bubble to the chat window
+        function addMessage(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', 'p-1');
+            
+            let bubbleClasses, textContent;
+            
+            if (sender === 'user') {
+                messageElement.classList.add('justify-end');
+                bubbleClasses = 'max-w-[85%] bg-blue-600 text-white p-3 rounded-xl rounded-br-none shadow-md';
+                textContent = escapeHTML(text);
+            } else { // 'ai' or 'error'
+                messageElement.classList.add('justify-start');
+                
+                if (text.includes("Error:") || sender === 'error') {
+                    // Specific styling for the API failed message
+                    bubbleClasses = 'max-w-[85%] bg-red-100 text-red-800 p-3 rounded-xl rounded-tl-none shadow-md border border-red-300';
+                    textContent = text; // Error text might already contain formatting
                 } else {
-                    await signInAnonymously(auth);
+                    // Standard AI response styling
+                    bubbleClasses = 'max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200';
+                    textContent = formatMarkdown(text);
                 }
-
-            } catch (error) {
-                console.error("Firebase authentication error:", error);
-                userId = 'auth_failed_' + crypto.randomUUID().substring(0, 8);
-                isAuthReady = true;
-                sendButton.disabled = false;
-            }
-        };
-
-        /**
-         * Renders a message bubble in the chat container.
-         * @param {string} content - The message text (can include markdown/HTML).
-         * @param {string} type - 'user' or 'ai'.
-         */
-        const renderMessage = (content, type) => {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('flex', type === 'user' ? 'justify-end' : 'justify-start');
-
-            const contentDiv = document.createElement('div');
-            contentDiv.classList.add('p-3', 'max-w-[90%]', 'sm:max-w-[70%]', 'text-sm', 'whitespace-pre-wrap');
-
-            if (type === 'user') {
-                contentDiv.classList.add('user-message');
-            } else if (type === 'ai') {
-                contentDiv.classList.add('ai-message');
-                // Simple markdown conversion for bolding
-                // Handles the *** bold/emphasis used in the system instruction
-                content = content.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
-                // Handles the ** bold used in the welcome message
-                content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             }
 
-            contentDiv.innerHTML = content;
-            messageDiv.appendChild(contentDiv);
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll
-        };
+            messageElement.innerHTML = `<div class="${bubbleClasses}">${textContent}</div>`;
+            chatWindow.appendChild(messageElement);
+            
+            // Scroll to the bottom of the chat window
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
 
-        /**
-         * Retries the API fetch with exponential backoff.
-         */
-        const fetchWithBackoff = async (url, payload) => {
-            const maxRetries = 5;
+        // Simple markdown formatter for AI responses
+        function formatMarkdown(text) {
+            // Bold (**text** to <b>text</b>)
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Italics (*text* or _text_ to <i>text</i>)
+            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>');
+            // New lines (\n to <br>)
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+
+        // Add a loading indicator (dots)
+        function addLoadingIndicator() {
+            const loadingElement = document.createElement('div');
+            loadingElement.id = 'loading-indicator';
+            loadingElement.classList.add('flex', 'justify-start', 'p-1');
+            loadingElement.innerHTML = `
+                <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
+                    <span class="loader">...</span>
+                </div>
+            `;
+            chatWindow.appendChild(loadingElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Scroll to bottom
+            return loadingElement;
+        }
+
+        // Remove the loading indicator
+        function removeLoadingIndicator() {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Exponential backoff retry logic for API calls
+        async function fetchWithRetry(url, options, maxRetries = 3, delay = 500) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
-                        if (response.status === 429) { 
-                             throw new Error(`Rate limit exceeded (Attempt ${i + 1}).`);
-                        }
-                        throw new Error(`Proxy error: ${errorData.message || response.statusText}`);
-                    }
-
-                    const result = await response.json();
+                    const response = await fetch(url, options);
                     
-                    if (result.text) {
-                        return result.text;
+                    if (response.ok) {
+                        return response.json();
+                    } else if (response.status === 429) { // Too Many Requests (Rate Limit)
+                        // Wait longer if rate limited
+                        await new Promise(resolve => setTimeout(resolve, delay * 2));
                     } else {
-                        throw new Error("Proxy response was empty or malformed.");
+                        // For other non-OK status codes (400, 500, etc.), throw an error immediately
+                        const errorData = await response.json().catch(() => ({ message: 'Unknown server error' }));
+                        throw new Error(`API returned status ${response.status}: ${errorData.message}`);
                     }
-
                 } catch (error) {
                     console.error(`Attempt ${i + 1} failed:`, error);
-                    if (i < maxRetries - 1) {
-                        const delay = Math.pow(2, i) * 1000 + (Math.random() * 500); // 1s, 2s, 4s, 8s, 16s + jitter
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } else {
+                    if (i === maxRetries - 1) {
                         throw new Error("API failed after multiple retries.");
                     }
+                    await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential delay
                 }
             }
-        };
+        }
 
-        /**
-         * Main function to handle user input and get AI response.
-         */
-        window.sendMessage = async () => {
+
+        async function handleSubmit(event) {
+            event.preventDefault();
             const prompt = userInput.value.trim();
             if (!prompt) return;
 
-            renderMessage(prompt, 'user');
+            // 1. Display user message
+            addMessage(prompt, 'user');
+            userInput.value = ''; // Clear input field
 
-            // Disable buttons and show loading
-            userInput.value = '';
+            // 2. Disable input and show loading
             sendButton.disabled = true;
             userInput.disabled = true;
-            loadingIndicator.classList.remove('hidden');
+            const loadingIndicator = addLoadingIndicator();
+
+            const systemInstruction = {
+                parts: [{ text: "You are a professional, helpful, and concise AI Health Assistant. You must always include a disclaimer: 'Disclaimer: I am an AI assistant, not a doctor.' at the start of every response. Your responses should be factual and never advise on specific medical treatments or diagnoses." }]
+            };
+
+            const payload = { prompt, systemInstruction };
 
             try {
-                // The proxy expects the user prompt and system instruction.
-                const payload = {
-                    prompt: prompt,
-                    systemInstruction: CHAT_SYSTEM_INSTRUCTION
-                };
+                // 3. Make the API call with retry logic
+                const result = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, 3); // Max 3 retries
 
-                const text = await fetchWithBackoff(GROQ_API_PROXY_URL, payload);
-                
-                renderMessage(text, 'ai');
+                // 4. Handle success response
+                removeLoadingIndicator();
+                if (result && result.text) {
+                    addMessage(result.text, 'ai');
+                } else {
+                    addMessage('Disclaimer: I am an AI assistant, not a doctor. I was unable to retrieve a response (empty data).', 'error');
+                }
 
             } catch (error) {
-                console.error("Message sending failed:", error);
-                renderMessage("***Disclaimer: I am an AI assistant, not a doctor.*** I am sorry, but I was unable to retrieve a response at this time. (Error: " + error.message + ")", 'ai');
+                // 5. Handle error response
+                removeLoadingIndicator();
+                console.error("Fetch failed:", error);
+                
+                // Display the specific error message caught by the retry logic
+                addMessage(`Disclaimer: I am an AI assistant, not a doctor. I am sorry, but I was unable to retrieve a response at this time. (Error: ${error.message})`, 'error');
+
             } finally {
-                loadingIndicator.classList.add('hidden');
+                // 6. Re-enable input
                 sendButton.disabled = false;
                 userInput.disabled = false;
                 userInput.focus();
             }
-        };
+        }
 
-        // Initialize the application on page load
-        window.onload = setupFirebase;
+        chatForm.addEventListener('submit', handleSubmit);
     </script>
 </body>
 </html>
