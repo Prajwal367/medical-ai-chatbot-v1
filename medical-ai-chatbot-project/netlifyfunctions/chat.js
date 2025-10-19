@@ -1,11 +1,10 @@
 /**
  * Secure Backend Proxy for Groq API
- * This file runs as a serverless function (on Netlify/Vercel) to hide the Groq API key.
- *
- * NOTE: For Vercel/Netlify, this file must be inside an 'api' folder and must export a handler function.
+ * This file runs as a serverless function on Netlify to securely proxy the Groq API key.
+ * * NOTE: Netlify Lambda functions export an asynchronous handler function.
  */
 
-// Use the environment variable set in Vercel/Netlify for security
+// Use the environment variable set in Netlify for security
 const API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = "mixtral-8x7b-32768";
 
@@ -14,29 +13,63 @@ if (!API_KEY) {
 }
 
 /**
- * Handles incoming chat requests and proxies them securely to the Groq API.
- * @param {object} req - The Vercel/Node.js request object.
- * @param {object} res - The Vercel/Node.js response object.
+ * Netlify Lambda function handler.
+ * @param {object} event - The Netlify event object containing request details.
+ * @returns {Promise<object>} The response object for the client.
  */
-module.exports = async (req, res) => {
-    // Set CORS headers to allow communication from the frontend
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
+exports.handler = async (event) => {
+    // Set CORS headers for security and browser compatibility
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Content-Type': 'application/json'
+    };
+    
     // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
     }
     
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ message: 'Method Not Allowed' })
+        };
     }
 
-    const { prompt, systemInstruction } = req.body;
+    if (!API_KEY) {
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ message: 'Server Configuration Error: API key is missing.' })
+        };
+    }
+
+    let body;
+    try {
+        body = JSON.parse(event.body);
+    } catch (e) {
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ message: 'Invalid JSON body.' })
+        };
+    }
+
+    const { prompt, systemInstruction } = body;
 
     if (!prompt) {
-        return res.status(400).json({ message: 'Missing required field: prompt.' });
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ message: 'Missing required field: prompt.' })
+        };
     }
 
     const apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
@@ -44,8 +77,8 @@ module.exports = async (req, res) => {
     const payload = {
         model: GROQ_MODEL,
         messages: [
-            // Ensure systemInstruction is handled gracefully if the parts structure isn't exactly as expected
-            { role: "system", content: (systemInstruction && systemInstruction.parts && systemInstruction.parts[0] && systemInstruction.parts[0].text) || "You are a helpful assistant." },
+            // Ensure systemInstruction is handled gracefully
+            { role: "system", content: (systemInstruction?.parts?.[0]?.text) || "You are a helpful assistant." },
             { role: "user", content: prompt }
         ],
         temperature: 0.7,
@@ -64,8 +97,18 @@ module.exports = async (req, res) => {
         });
 
         if (!apiResponse.ok) {
-            const errorBody = await apiResponse.json();
-            return res.status(apiResponse.status).json({ message: 'Groq API Error', details: errorBody });
+            const errorBody = await apiResponse.json().catch(() => ({}));
+            // Groq API usually returns 401 for invalid keys
+            const detailMessage = errorBody.error?.message || `Groq returned status ${apiResponse.status}.`;
+            
+            return {
+                statusCode: apiResponse.status,
+                headers,
+                body: JSON.stringify({ 
+                    message: 'Groq API Error', 
+                    details: detailMessage 
+                })
+            };
         }
 
         const result = await apiResponse.json();
@@ -73,13 +116,25 @@ module.exports = async (req, res) => {
 
         if (text) {
             // Send back the generated text to the frontend
-            return res.status(200).json({ text: text });
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({ text: text })
+            };
         } else {
-            return res.status(500).json({ message: 'Groq response was empty or malformed.' });
+            return {
+                statusCode: 500,
+                headers,
+                body: JSON.stringify({ message: 'Groq response was empty or malformed.' })
+            };
         }
 
     } catch (error) {
         console.error('Backend Groq API Error:', error);
-        return res.status(500).json({ message: 'Internal Server Error during AI call.' });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ message: `Internal Server Error: ${error.message}` })
+        };
     }
 };
