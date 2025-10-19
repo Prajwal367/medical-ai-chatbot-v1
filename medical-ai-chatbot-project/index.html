@@ -7,6 +7,14 @@
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Ensure HTML and Body take up the full viewport height */
+        html, body {
+            height: 100%;
+            margin: 0;
+            /* New: Added overflow-hidden to prevent body scrollbars if content slightly exceeds viewport */
+            overflow: hidden; 
+        }
+        
         /* Custom scrollbar styling for the chat window */
         #chat-window::-webkit-scrollbar {
             width: 8px;
@@ -20,13 +28,15 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 font-sans antialiased h-screen flex justify-center items-center p-4">
+<!-- UPDATED: Reverted body to simple flex settings for full-page layout, ensuring no external margin/padding -->
+<body class="bg-gray-100 font-sans antialiased h-screen flex p-0"> 
 
-    <!-- Main Chat Container -->
-    <div class="flex flex-col bg-white shadow-2xl rounded-xl w-full max-w-lg h-full max-h-[90vh] overflow-hidden">
+    <!-- Main Chat Container - UPDATED: Removed ALL responsiveness and centering to force 100% width/height on ALL screens -->
+    <div class="flex flex-col bg-white w-full h-full rounded-none overflow-hidden">
         
         <!-- Header -->
-        <header class="flex items-center justify-between p-4 bg-blue-700 text-white rounded-t-xl shadow-lg flex-shrink-0">
+        <!-- UPDATED: Removed rounded-t-xl constraint to match full-screen aesthetic -->
+        <header class="flex items-center justify-between p-4 bg-blue-700 text-white rounded-t-none shadow-lg flex-shrink-0">
             <h1 class="text-xl font-bold flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -81,7 +91,7 @@
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
 
-        // IMPORTANT FIX: Updated API path to Netlify Functions convention
+        // IMPORTANT FIX: Path to the Netlify Function handler
         const apiUrl = '/.netlify/functions/chat'; 
 
         // Utility to escape HTML for safe insertion (not strictly needed here, but good practice)
@@ -162,19 +172,31 @@
                     const response = await fetch(url, options);
                     
                     if (response.ok) {
-                        return response.json();
-                    } else if (response.status === 429) { // Too Many Requests (Rate Limit)
-                        // Wait longer if rate limited
-                        await new Promise(resolve => setTimeout(resolve, delay * 2));
+                        // Check if the successful response is a JSON object with text
+                        const data = await response.json();
+                        if (data && data.text) {
+                             return data;
+                        } else {
+                            // If the function returned a success status but empty/malformed body
+                            throw new Error("Function returned successful status but malformed data or no text field.");
+                        }
                     } else {
-                        // For other non-OK status codes (400, 500, etc.), throw an error immediately
-                        const errorData = await response.json().catch(() => ({ message: 'Unknown server error' }));
-                        throw new Error(`API returned status ${response.status}: ${errorData.message}`);
+                        // For non-OK status codes (400, 500, etc.)
+                        let errorDetails = '';
+                        try {
+                            const errorData = await response.json();
+                            errorDetails = errorData.message || `Status ${response.status} Error`;
+                        } catch (e) {
+                            errorDetails = `HTTP Status ${response.status}. Could not parse server error.`;
+                        }
+                        
+                        // We do not retry on client/server errors that are not rate limit
+                        throw new Error(`Server failed: ${errorDetails}`);
                     }
                 } catch (error) {
                     console.error(`Attempt ${i + 1} failed:`, error);
                     if (i === maxRetries - 1) {
-                        throw new Error("API failed after multiple retries.");
+                        throw new Error(error.message || "API failed after multiple retries.");
                     }
                     await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential delay
                 }
