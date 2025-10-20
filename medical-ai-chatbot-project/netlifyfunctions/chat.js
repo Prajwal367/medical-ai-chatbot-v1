@@ -5,7 +5,7 @@
  */
 
 // Use the environment variable set in Netlify for security
-const API_KEY = "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";
+const API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = "mixtral-8x7b-32768";
 
 if (!API_KEY) {
