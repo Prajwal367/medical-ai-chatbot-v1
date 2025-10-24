@@ -1,0 +1,20 @@
+[build]
+
+This sets the folder Netlify will look in for your functions
+
+functions = "netlify/functions"
+
+This is the command Netlify will run to build your site (standard for static sites)
+
+command = "echo 'No build command needed for this static site with functions.'"
+
+This sets the public directory where your HTML file lives (usually the root)
+
+publish = "."
+
+Required to proxy the /.netlify/functions/chat path to the serverless function
+
+[[redirects]]
+from = "/.netlify/functions/*"
+to = "/.netlify/functions/:splat"
+status = 200
