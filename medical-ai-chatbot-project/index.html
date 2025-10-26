@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Health Assistant Chatbot</title>
+    
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -11,7 +12,6 @@
         html, body {
             height: 100%;
             margin: 0;
-            /* New: Added overflow-hidden to prevent body scrollbars if content slightly exceeds viewport */
             overflow: hidden; 
         }
         
@@ -28,14 +28,11 @@
         }
     </style>
 </head>
-<!-- UPDATED: Reverted body to simple flex settings for full-page layout, ensuring no external margin/padding -->
 <body class="bg-gray-100 font-sans antialiased h-screen flex p-0"> 
 
-    <!-- Main Chat Container - UPDATED: Removed ALL responsiveness and centering to force 100% width/height on ALL screens -->
     <div class="flex flex-col bg-white w-full h-full rounded-none overflow-hidden">
         
         <!-- Header -->
-        <!-- UPDATED: Removed rounded-t-xl constraint to match full-screen aesthetic -->
         <header class="flex items-center justify-between p-4 bg-blue-700 text-white rounded-t-none shadow-lg flex-shrink-0">
             <h1 class="text-xl font-bold flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,14 +43,14 @@
             <span class="text-sm font-light opacity-80">Fast Text-Only Project | [Your Name]</span>
         </header>
 
-        <!-- Mandatory Disclaimer -->
-        <div id="disclaimer" class="p-3 bg-orange-200 text-orange-800 text-xs font-medium border-l-4 border-orange-500 flex-shrink-0">
+        <!-- Disclaimer -->
+        <div id="disclaimer" class="p-3 bg-yellow-200 text-yellow-800 text-xs font-medium border-l-4 border-yellow-500 flex-shrink-0">
             <span class="font-bold">MANDATORY WARNING:</span> This tool uses AI and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
         </div>
 
         <!-- Chat Window -->
         <div id="chat-window" class="flex-grow p-4 space-y-4 overflow-y-auto bg-gray-50">
-            <!-- Initial AI Message -->
+            <!-- Initial Greeting -->
             <div class="flex justify-start">
                 <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
                     <p class="font-medium">Hello! I am an **AI Health Assistant** powered by Groq.</p>
@@ -61,7 +58,7 @@
                     <p class="mt-2 text-xs italic text-blue-700">**Remember: I am not a doctor.** Please start by asking a general health question (e.g., "What are common symptoms of seasonal allergies?" or "What are the benefits of walking?").</p>
                 </div>
             </div>
-            <!-- Messages will be injected here by JavaScript -->
+            <!-- Messages go here -->
         </div>
 
         <!-- Input Form -->
@@ -91,8 +88,8 @@
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
 
-        // IMPORTANT FIX: Path to the Netlify Function handler
-        const apiUrl = '/.netlify/functions/chat'; 
+        // *** CRITICAL FIX: The path no longer starts with a slash, fixing the double-slash 404 error ***
+        const apiUrl = '.netlify/functions/chat'; 
 
         // Utility to escape HTML for safe insertion (not strictly needed here, but good practice)
         function escapeHTML(str) {
@@ -171,27 +168,28 @@
                 try {
                     const response = await fetch(url, options);
                     
-                    if (response.ok) {
-                        // Check if the successful response is a JSON object with text
-                        const data = await response.json();
-                        if (data && data.text) {
-                             return data;
-                        } else {
-                            // If the function returned a success status but empty/malformed body
-                            throw new Error("Function returned successful status but malformed data or no text field.");
-                        }
-                    } else {
-                        // For non-OK status codes (400, 500, etc.)
-                        let errorDetails = '';
+                    // If the response is not OK, we immediately try to get error details
+                    if (!response.ok) {
+                         let errorDetails = '';
                         try {
                             const errorData = await response.json();
-                            errorDetails = errorData.message || `Status ${response.status} Error`;
+                            errorDetails = errorData.message || `Groq returned status ${response.status}.`;
+                            // Specific check for 401 if it contains "Unauthorized"
+                            if (response.status === 401 && errorData.error?.message.includes("Unauthorized")) {
+                                errorDetails = "Groq API Key Unauthorized. Please check your key.";
+                            }
                         } catch (e) {
                             errorDetails = `HTTP Status ${response.status}. Could not parse server error.`;
                         }
-                        
-                        // We do not retry on client/server errors that are not rate limit
                         throw new Error(`Server failed: ${errorDetails}`);
+                    }
+                    
+                    // If response is OK, parse JSON and check for text
+                    const data = await response.json();
+                    if (data && data.text) {
+                         return data;
+                    } else {
+                        throw new Error("Function returned successful status but malformed data or no text field.");
                     }
                 } catch (error) {
                     console.error(`Attempt ${i + 1} failed:`, error);
