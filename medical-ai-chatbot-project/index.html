@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Health Assistant Chatbot</title>
+    <title>Health Assistant</title>
     
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,6 +13,7 @@
             height: 100%;
             margin: 0;
             overflow: hidden; 
+            font-family: 'Inter', sans-serif;
         }
         
         /* Custom scrollbar styling for the chat window */
@@ -26,6 +27,15 @@
         #chat-window::-webkit-scrollbar-track {
             background: #eef2ff; /* Very light background */
         }
+
+        /* Loading indicator for the dots */
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        .loader span {
+            animation: blink 1s infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans antialiased h-screen flex p-0"> 
@@ -38,14 +48,14 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                AI Health Assistant
+                Health Assistant
             </h1>
-            <span class="text-sm font-light opacity-80">Fast Text-Only Project | [Your Name]</span>
+            <span class="text-sm font-light opacity-80">Fact Finder Project</span>
         </header>
 
         <!-- Disclaimer -->
         <div id="disclaimer" class="p-3 bg-yellow-200 text-yellow-800 text-xs font-medium border-l-4 border-yellow-500 flex-shrink-0">
-            <span class="font-bold">MANDATORY WARNING:</span> This tool uses AI and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
+            <span class="font-bold">MANDATORY WARNING:</span> This tool uses Wikipedia and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
         </div>
 
         <!-- Chat Window -->
@@ -53,9 +63,9 @@
             <!-- Initial Greeting -->
             <div class="flex justify-start">
                 <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
-                    <p class="font-medium">Hello! I am an **AI Health Assistant** powered by Groq.</p>
-                    <p class="mt-1">I can provide fast, concise facts on health topics. ***How may I assist you today?***</p>
-                    <p class="mt-2 text-xs italic text-blue-700">**Remember: I am not a doctor.** Please start by asking a general health question (e.g., "What are common symptoms of seasonal allergies?" or "What are the benefits of walking?").</p>
+                    <p class="font-medium">Hello! I am a **Wikipedia Health Assistant**.</p>
+                    <p class="mt-1">I can provide quick, sourced summaries from Wikipedia. ***What health topic would you like to search for?***</p>
+                    <p class="mt-2 text-xs italic text-blue-700">Please start by asking a general health question (e.g., "seasonal allergies," "benefits of walking," or "what is an aneurysm?").</p>
                 </div>
             </div>
             <!-- Messages go here -->
@@ -66,7 +76,7 @@
             <input 
                 type="text" 
                 id="user-input" 
-                placeholder="Ask a health question..." 
+                placeholder="Search for a health topic..." 
                 class="flex-grow p-3 border border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition duration-150 shadow-inner" 
                 required
             />
@@ -88,10 +98,12 @@
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
 
-        // *** CRITICAL FIX: The path no longer starts with a slash, fixing the double-slash 404 error ***
-        const apiUrl = '.netlify/functions/chat'; 
+        // Wikipedia API URL for searching and fetching summaries
+        const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
+        
+        // --- Core UI Functions ---
 
-        // Utility to escape HTML for safe insertion (not strictly needed here, but good practice)
+        // Utility to escape HTML for safe insertion
         function escapeHTML(str) {
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
@@ -110,14 +122,14 @@
             } else { // 'ai' or 'error'
                 messageElement.classList.add('justify-start');
                 
-                if (text.includes("Error:") || sender === 'error') {
-                    // Specific styling for the API failed message
+                if (sender === 'error') {
+                    // Specific styling for the failure message
                     bubbleClasses = 'max-w-[85%] bg-red-100 text-red-800 p-3 rounded-xl rounded-tl-none shadow-md border border-red-300';
-                    textContent = text; // Error text might already contain formatting
+                    textContent = text;
                 } else {
                     // Standard AI response styling
                     bubbleClasses = 'max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200';
-                    textContent = formatMarkdown(text);
+                    textContent = text; // Content is already formatted/HTML
                 }
             }
 
@@ -128,17 +140,6 @@
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
-        // Simple markdown formatter for AI responses
-        function formatMarkdown(text) {
-            // Bold (**text** to <b>text</b>)
-            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            // Italics (*text* or _text_ to <i>text</i>)
-            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>');
-            // New lines (\n to <br>)
-            text = text.replace(/\n/g, '<br>');
-            return text;
-        }
-
         // Add a loading indicator (dots)
         function addLoadingIndicator() {
             const loadingElement = document.createElement('div');
@@ -146,7 +147,7 @@
             loadingElement.classList.add('flex', 'justify-start', 'p-1');
             loadingElement.innerHTML = `
                 <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
-                    <span class="loader">...</span>
+                    <span class="loader text-lg font-bold">. . .</span>
                 </div>
             `;
             chatWindow.appendChild(loadingElement);
@@ -162,45 +163,66 @@
             }
         }
 
-        // Exponential backoff retry logic for API calls
-        async function fetchWithRetry(url, options, maxRetries = 3, delay = 500) {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(url, options);
-                    
-                    // If the response is not OK, we immediately try to get error details
-                    if (!response.ok) {
-                         let errorDetails = '';
-                        try {
-                            const errorData = await response.json();
-                            errorDetails = errorData.message || `Groq returned status ${response.status}.`;
-                            // Specific check for 401 if it contains "Unauthorized"
-                            if (response.status === 401 && errorData.error?.message.includes("Unauthorized")) {
-                                errorDetails = "Groq API Key Unauthorized. Please check your key.";
-                            }
-                        } catch (e) {
-                            errorDetails = `HTTP Status ${response.status}. Could not parse server error.`;
-                        }
-                        throw new Error(`Server failed: ${errorDetails}`);
-                    }
-                    
-                    // If response is OK, parse JSON and check for text
-                    const data = await response.json();
-                    if (data && data.text) {
-                         return data;
-                    } else {
-                        throw new Error("Function returned successful status but malformed data or no text field.");
-                    }
-                } catch (error) {
-                    console.error(`Attempt ${i + 1} failed:`, error);
-                    if (i === maxRetries - 1) {
-                        throw new Error(error.message || "API failed after multiple retries.");
-                    }
-                    await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential delay
-                }
-            }
+        // --- Wikipedia API Functions ---
+
+        /**
+         * Executes a Wikipedia search and returns the top article title.
+         */
+        async function searchWikipedia(searchTerm) {
+            const searchParams = new URLSearchParams({
+                action: 'query',
+                list: 'search',
+                srsearch: searchTerm, 
+                format: 'json',
+                srlimit: 1, // Only need the top result
+                origin: '*' // CRITICAL for CORS/browser requests
+            });
+
+            const searchResponse = await fetch(`${WIKIPEDIA_API_URL}?${searchParams.toString()}`);
+            const searchResult = await searchResponse.json();
+            return searchResult.query?.search?.[0]?.title || null;
         }
 
+        /**
+         * Fetches and formats the summary from a Wikipedia article title.
+         */
+        async function fetchWikipediaSummary(title) {
+            const extractParams = new URLSearchParams({
+                action: 'query',
+                titles: title,
+                prop: 'extracts',
+                exchars: 1200, // Get up to 1200 characters of the summary
+                explaintext: 1, // Get plain text (no HTML)
+                format: 'json',
+                redirects: 1, // Follow redirects
+                origin: '*' // CRITICAL for CORS/browser requests
+            });
+
+            const extractResponse = await fetch(`${WIKIPEDIA_API_URL}?${extractParams.toString()}`);
+            const extractResult = await extractResponse.json();
+
+            const pages = extractResult.query?.pages;
+            const pageId = Object.keys(pages)[0];
+            const extract = pages[pageId]?.extract;
+
+            if (!extract) {
+                return null;
+            }
+
+            // Clean up the extract (remove excess newlines) and get the first main paragraph
+            let cleanedExtract = extract.split('\n').filter(p => p.trim() !== '')[0]; 
+            
+            // Format the final response with a link
+            const sourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
+            
+            let htmlContent = `<p class="font-bold text-sm">Wikipedia Result for "${title}"</p>`;
+            htmlContent += `<p class="mt-2">${cleanedExtract}</p>`;
+            htmlContent += `<p class="mt-3 text-xs italic text-blue-700">Source: <a href="${sourceUrl}" target="_blank" class="underline hover:text-blue-900">${sourceUrl}</a></p>`;
+            
+            return htmlContent;
+        }
+
+        // --- Main Submission Handler ---
 
         async function handleSubmit(event) {
             event.preventDefault();
@@ -215,39 +237,38 @@
             sendButton.disabled = true;
             userInput.disabled = true;
             const loadingIndicator = addLoadingIndicator();
-
-            const systemInstruction = {
-                parts: [{ text: "You are a professional, helpful, and concise AI Health Assistant. You must always include a disclaimer: 'Disclaimer: I am an AI assistant, not a doctor.' at the start of every response. Your responses should be factual and never advise on specific medical treatments or diagnoses." }]
-            };
-
-            const payload = { prompt, systemInstruction };
+            
+            let responseContent = '';
+            let isError = false;
 
             try {
-                // 3. Make the API call with retry logic
-                const result = await fetchWithRetry(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }, 3); // Max 3 retries
+                // 3. Search for the best Wikipedia title
+                const title = await searchWikipedia(prompt);
 
-                // 4. Handle success response
-                removeLoadingIndicator();
-                if (result && result.text) {
-                    addMessage(result.text, 'ai');
+                if (!title) {
+                    responseContent = `Disclaimer: I am a fact-finding assistant. I could not find a relevant Wikipedia article for **"${escapeHTML(prompt)}"**. Please try a more specific health term.`;
+                    isError = true;
                 } else {
-                    addMessage('Disclaimer: I am an AI assistant, not a doctor. I was unable to retrieve a response (empty data).', 'error');
+                    // 4. Fetch the summary using the title
+                    const summaryHtml = await fetchWikipediaSummary(title);
+                    if (summaryHtml) {
+                        responseContent = `Disclaimer: I am a fact-finding assistant, not a doctor. ${summaryHtml}`;
+                    } else {
+                        responseContent = `Disclaimer: I am a fact-finding assistant. Found article "${title}" but could not extract a summary.`;
+                        isError = true;
+                    }
                 }
 
             } catch (error) {
-                // 5. Handle error response
-                removeLoadingIndicator();
-                console.error("Fetch failed:", error);
-                
-                // Display the specific error message caught by the retry logic
-                addMessage(`Disclaimer: I am an AI assistant, not a doctor. I am sorry, but I was unable to retrieve a response at this time. (Error: ${error.message})`, 'error');
+                // 5. Handle network or API failure
+                console.error("Wikipedia fetch failed:", error);
+                responseContent = `Disclaimer: I am a fact-finding assistant. An internal error occurred while trying to connect to the Wikipedia API. Please check your network connection. (Error: ${error.message})`;
+                isError = true;
 
             } finally {
-                // 6. Re-enable input
+                // 6. Display response and re-enable input
+                removeLoadingIndicator();
+                addMessage(responseContent, isError ? 'error' : 'ai');
                 sendButton.disabled = false;
                 userInput.disabled = false;
                 userInput.focus();
