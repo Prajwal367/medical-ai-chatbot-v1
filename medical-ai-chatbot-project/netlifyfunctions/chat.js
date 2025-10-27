@@ -1,140 +1,131 @@
+const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
+
 /**
- * Secure Backend Proxy for Groq API
- * This file runs as a serverless function on Netlify to securely proxy the Groq API key.
- * * NOTE: Netlify Lambda functions export an asynchronous handler function.
+ * Searches Wikipedia for the best matching article title.
+ * @param {string} searchTerm The user's query.
+ * @returns {Promise<string | null>} The article title, or null if not found.
  */
+async function searchWikipedia(searchTerm) {
+    const searchParams = new URLSearchParams({
+        action: 'query',
+        list: 'search',
+        srsearch: searchTerm, 
+        format: 'json',
+        srlimit: 1, // Only need the top result
+        // We do not need 'origin: *' here because this is running server-side (Node.js)
+    });
 
-// Use the environment variable set in Netlify for security
-const API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = "mixtral-8x7b-32768";
-
-if (!API_KEY) {
-    console.error("GROQ_API_KEY environment variable is not set!");
+    try {
+        const searchResponse = await fetch(`${WIKIPEDIA_API_URL}?${searchParams.toString()}`);
+        const searchResult = await searchResponse.json();
+        // Return the title of the first search result
+        return searchResult.query?.search?.[0]?.title || null;
+    } catch (e) {
+        console.error("Wikipedia search failed:", e);
+        return null;
+    }
 }
 
 /**
- * Netlify Lambda function handler.
- * @param {object} event - The Netlify event object containing request details.
- * @returns {Promise<object>} The response object for the client.
+ * Fetches and formats the summary from a Wikipedia article title.
+ * @param {string} title The exact title of the Wikipedia article.
+ * @returns {Promise<string | null>} The formatted HTML summary, or null if failed.
  */
-exports.handler = async (event) => {
-    // Set CORS headers for security and browser compatibility
-    const headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Content-Type': 'application/json'
-    };
-    
-    // Handle preflight requests
-    if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers,
-            body: ''
-        };
+async function fetchWikipediaSummary(title) {
+    const extractParams = new URLSearchParams({
+        action: 'query',
+        titles: title,
+        prop: 'extracts',
+        exchars: 1200, // Get up to 1200 characters of the summary
+        explaintext: 1, // Get plain text (no HTML)
+        format: 'json',
+        redirects: 1, // Follow redirects
+    });
+
+    try {
+        const extractResponse = await fetch(`${WIKIPEDIA_API_URL}?${extractParams.toString()}`);
+        const extractResult = await extractResponse.json();
+
+        const pages = extractResult.query?.pages;
+        const pageId = Object.keys(pages)[0];
+        const extract = pages[pageId]?.extract;
+
+        if (!extract) {
+            return null;
+        }
+
+        // Clean up the extract (remove excess newlines) and get the first main paragraph
+        let cleanedExtract = extract.split('\n').filter(p => p.trim() !== '')[0]; 
+        
+        // Format the final response with a link (using simple markdown/text for the backend output)
+        const sourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
+        
+        // The frontend will render this as HTML
+        let htmlContent = `<p class="font-bold text-sm">Wikipedia Result for "${title}"</p>`;
+        // Replace newlines with <br> for proper rendering in the HTML frontend
+        htmlContent += `<p class="mt-2">${cleanedExtract.replace(/\n/g, '<br>')}</p>`;
+        htmlContent += `<p class="mt-3 text-xs italic text-blue-700">Source: <a href="${sourceUrl}" target="_blank" class="underline hover:text-blue-900">${sourceUrl}</a></p>`;
+        
+        return htmlContent;
+
+    } catch (e) {
+        console.error("Wikipedia summary fetch failed:", e);
+        return null;
     }
-    
+}
+
+
+// Main handler for the Netlify Function
+exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
-            headers,
-            body: JSON.stringify({ message: 'Method Not Allowed' })
+            body: JSON.stringify({ message: "Method Not Allowed" }),
         };
     }
-
-    if (!API_KEY) {
-        return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ message: 'Server Configuration Error: API key is missing.' })
-        };
-    }
-
-    let body;
-    try {
-        body = JSON.parse(event.body);
-    } catch (e) {
-        return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ message: 'Invalid JSON body.' })
-        };
-    }
-
-    const { prompt, systemInstruction } = body;
-
-    if (!prompt) {
-        return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ message: 'Missing required field: prompt.' })
-        };
-    }
-
-    const apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-
-    const payload = {
-        model: GROQ_MODEL,
-        messages: [
-            // Ensure systemInstruction is handled gracefully
-            { role: "system", content: (systemInstruction?.parts?.[0]?.text) || "You are a helpful assistant." },
-            { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-        stream: false,
-    };
 
     try {
-        const apiResponse = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`
-            },
-            body: JSON.stringify(payload)
-        });
+        const { prompt } = JSON.parse(event.body);
 
-        if (!apiResponse.ok) {
-            const errorBody = await apiResponse.json().catch(() => ({}));
-            // Groq API usually returns 401 for invalid keys
-            const detailMessage = errorBody.error?.message || `Groq returned status ${apiResponse.status}.`;
-            
+        if (!prompt) {
             return {
-                statusCode: apiResponse.status,
-                headers,
-                body: JSON.stringify({ 
-                    message: 'Groq API Error', 
-                    details: detailMessage 
-                })
+                statusCode: 400,
+                body: JSON.stringify({ message: "Missing required 'prompt' in the request body." }),
             };
         }
-
-        const result = await apiResponse.json();
-        const text = result.choices?.[0]?.message?.content;
-
-        if (text) {
-            // Send back the generated text to the frontend
-            return {
-                statusCode: 200,
-                headers,
-                body: JSON.stringify({ text: text })
-            };
+        
+        // 1. Search for the article title
+        const title = await searchWikipedia(prompt);
+        
+        let generatedText;
+        if (!title) {
+            // No article found
+            generatedText = `Disclaimer: I am a fact-finding assistant. I could not find a relevant Wikipedia article for **"${prompt}"**. Please try a more specific health term.`;
         } else {
-            return {
-                statusCode: 500,
-                headers,
-                body: JSON.stringify({ message: 'Groq response was empty or malformed.' })
-            };
+            // 2. Fetch the summary
+            const summaryHtml = await fetchWikipediaSummary(title);
+
+            if (summaryHtml) {
+                generatedText = `Disclaimer: I am a fact-finding assistant, not a doctor. ${summaryHtml}`;
+            } else {
+                generatedText = `Disclaimer: I am a fact-finding assistant. Found article "${title}" but could not extract a summary.`;
+            }
         }
+
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: generatedText }),
+        };
 
     } catch (error) {
-        console.error('Backend Groq API Error:', error);
+        console.error("Function Error:", error);
         return {
             statusCode: 500,
-            headers,
-            body: JSON.stringify({ message: `Internal Server Error: ${error.message}` })
+            body: JSON.stringify({ 
+                message: "Internal Server Error during Wikipedia search.",
+                error: error.toString()
+            }),
         };
     }
 };
