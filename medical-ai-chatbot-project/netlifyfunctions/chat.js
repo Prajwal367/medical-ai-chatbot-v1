@@ -1,9 +1,60 @@
 const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
 
+// List of non-medical keywords that should trigger a rejection if they are the sole focus.
+const NON_MEDICAL_KEYWORDS = [
+    "queen", "king", "president", "country", "city", "village", 
+    "novel", "movie", "song", "album", "history", "art", 
+    "politics", "religion", "weather", "sports", "celebrity", 
+    "actor", "actress", "singer", "artist", "book", "car", "place"
+];
+
+/**
+ * Checks if the prompt is a simple greeting.
+ */
+const isGreeting = (prompt) => {
+    // Matches common greetings at the beginning of the prompt
+    const greetings = /^(hi|hello|hey|greetings|hallo|what's up|how are you|how is it going)\b/i;
+    return greetings.test(prompt.trim().toLowerCase());
+};
+
+/**
+ * Cleans the prompt to get a precise search term.
+ * E.g., "I have a fever" -> "fever"
+ */
+const cleanMedicalPrompt = (prompt) => {
+    let cleaned = prompt.trim();
+    // Remove conversational filler phrases
+    cleaned = cleaned.replace(/^(i have a|i feel|what is|tell me about|what are|the benefits of|i want to know about)\s+/i, '');
+    return cleaned.trim();
+};
+
+/**
+ * Determines if the search term is likely non-medical.
+ */
+const isLikelyNonMedical = (searchTerm) => {
+    const lowerTerm = searchTerm.toLowerCase();
+    
+    // Check if the cleaned term is just a number or very short (which often leads to bad results)
+    if (lowerTerm.length < 3 || !isNaN(lowerTerm)) {
+        return false; // Let the search proceed for short terms like 'flu' or 'pain'
+    }
+
+    // Check against the non-medical keywords list
+    for (const keyword of NON_MEDICAL_KEYWORDS) {
+        if (lowerTerm.includes(keyword)) {
+            // A simple check: if the main cleaned term contains a non-medical keyword, reject it.
+            // Example: 'Queen Victoria' contains 'queen' -> reject.
+            return true;
+        }
+    }
+    return false;
+};
+
+
+// ... [searchWikipedia and fetchWikipediaSummary functions remain the same] ...
+
 /**
  * Searches Wikipedia for the best matching article title.
- * @param {string} searchTerm The user's query.
- * @returns {Promise<string | null>} The article title, or null if not found.
  */
 async function searchWikipedia(searchTerm) {
     const searchParams = new URLSearchParams({
@@ -12,13 +63,11 @@ async function searchWikipedia(searchTerm) {
         srsearch: searchTerm, 
         format: 'json',
         srlimit: 1, // Only need the top result
-        // We do not need 'origin: *' here because this is running server-side (Node.js)
     });
 
     try {
         const searchResponse = await fetch(`${WIKIPEDIA_API_URL}?${searchParams.toString()}`);
         const searchResult = await searchResponse.json();
-        // Return the title of the first search result
         return searchResult.query?.search?.[0]?.title || null;
     } catch (e) {
         console.error("Wikipedia search failed:", e);
@@ -28,8 +77,6 @@ async function searchWikipedia(searchTerm) {
 
 /**
  * Fetches and formats the summary from a Wikipedia article title.
- * @param {string} title The exact title of the Wikipedia article.
- * @returns {Promise<string | null>} The formatted HTML summary, or null if failed.
  */
 async function fetchWikipediaSummary(title) {
     const extractParams = new URLSearchParams({
@@ -54,17 +101,13 @@ async function fetchWikipediaSummary(title) {
             return null;
         }
 
-        // Clean up the extract (remove excess newlines) and get the first main paragraph
         let cleanedExtract = extract.split('\n').filter(p => p.trim() !== '')[0]; 
         
-        // Format the final response with a link (using simple markdown/text for the backend output)
         const sourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
         
-        // The frontend will render this as HTML
         let htmlContent = `<p class="font-bold text-sm">Wikipedia Result for "${title}"</p>`;
-        // Replace newlines with <br> for proper rendering in the HTML frontend
         htmlContent += `<p class="mt-2">${cleanedExtract.replace(/\n/g, '<br>')}</p>`;
-        htmlContent += `<p class="mt-3 text-xs italic text-blue-700">Source: <a href="${sourceUrl}" target="_blank" class="underline hover:text-blue-900">${sourceUrl}</a></p>`;
+        htmlContent += `<p class="mt-3 text-xs italic text-blue-700">Source: <a href="${sourceUrl}" target="_blank" class="underline hover:text-blue-900">Read the full article on Wikipedia</a></p>`;
         
         return htmlContent;
 
@@ -78,31 +121,39 @@ async function fetchWikipediaSummary(title) {
 // Main handler for the Netlify Function
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: JSON.stringify({ message: "Method Not Allowed" }),
-        };
+        return { statusCode: 405, body: JSON.stringify({ message: "Method Not Allowed" }) };
     }
 
     try {
         const { prompt } = JSON.parse(event.body);
-
         if (!prompt) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ message: "Missing required 'prompt' in the request body." }),
-            };
+            return { statusCode: 400, body: JSON.stringify({ message: "Missing required 'prompt' in the request body." }) };
         }
         
-        // 1. Search for the article title
-        const title = await searchWikipedia(prompt);
-        
         let generatedText;
-        if (!title) {
-            // No article found
+
+        // --- 1. Small Talk Check ---
+        if (isGreeting(prompt)) {
+            generatedText = "Hello there! I'm here to provide Wikipedia information on **health and medical topics** only. How can I help you find a medical fact today?";
+            return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: generatedText }) };
+        }
+
+        // --- 2. Clean and Filter Query ---
+        const cleanedQuery = cleanMedicalPrompt(prompt);
+        
+        if (isLikelyNonMedical(cleanedQuery)) {
+            generatedText = `I apologize, but my function is strictly limited to **health and medical topics**. I cannot search for information about "${cleanedQuery}". Please try a health-related question instead.`;
+            return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: generatedText }) };
+        }
+        
+        // --- 3. Search and Fetch ---
+        
+        // Use the cleaned query for a better search result (e.g., "fever" instead of "I have a fever")
+        const title = await searchWikipedia(cleanedQuery); 
+        
+        if (!title || title.toLowerCase() === 'wikipedia') { // "wikipedia" itself is often the first search result on non-topics
             generatedText = `Disclaimer: I am a fact-finding assistant. I could not find a relevant Wikipedia article for **"${prompt}"**. Please try a more specific health term.`;
         } else {
-            // 2. Fetch the summary
             const summaryHtml = await fetchWikipediaSummary(title);
 
             if (summaryHtml) {
