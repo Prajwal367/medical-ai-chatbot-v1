@@ -10,62 +10,62 @@
         /* Set the overall document background and font */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8; /* Light blue-gray background */
+            background-color: #ffffff; /* Clean white background for full canvas */
         }
         /* Custom scrollbar for the chat history */
         .chat-history::-webkit-scrollbar {
             width: 8px;
         }
         .chat-history::-webkit-scrollbar-thumb {
-            background-color: #94a3b8; /* Smoother gray scrollbar */
+            background-color: #93c5fd; /* Soft blue scrollbar */
             border-radius: 4px;
         }
         .chat-history::-webkit-scrollbar-track {
-            background: #f0f4f8;
+            background: #f1f5f9; /* Light track */
         }
         /* Style for the user message bubble */
         .user-message {
-            background-color: #2563eb; /* Darker Blue for user */
+            background-color: #2563eb; /* Strong Blue for user */
             color: white;
             align-self: flex-end;
-            border-bottom-right-radius: 0;
+            border-bottom-right-radius: 4px; /* More modern, slightly less aggressive corner */
         }
         /* Style for the assistant message bubble */
         .assistant-message {
-            background-color: #f8fafc; /* Near-white for assistant */
+            background-color: #e0f2fe; /* Very light blue for contrast and comfort */
             color: #1f2937;
             align-self: flex-start;
-            border-bottom-left-radius: 0;
-            border: 1px solid #e2e8f0; /* Subtle border */
+            border-bottom-left-radius: 4px;
+            border: 1px solid #bfdbfe; /* Subtle light blue border */
         }
-        /* Hide outline on focus for accessibility */
-        input:focus, button:focus {
-            outline: none;
-            box-shadow: none;
+        /* Ensure the body and html take up full height of the viewport */
+        html, body, #chat-container {
+            height: 100%;
+            width: 100%;
         }
     </style>
 </head>
-<!-- Removed centered justify-center and padding (p-0 md:p-4) to ensure full screen usage -->
-<body class="w-screen h-screen flex">
+<!-- Removed w-screen/h-screen from body as per new style block, but ensuring flex layout -->
+<body class="flex flex-col">
 
-    <!-- Chat Container -->
-    <!-- Removed md:h-[90vh] to force full height on all screens/containers -->
-    <!-- Max width on desktop, full width/height on mobile -->
-    <div id="chat-container" class="w-full h-full flex flex-col bg-white shadow-none md:shadow-2xl md:rounded-xl overflow-hidden max-w-full md:max-w-3xl lg:max-w-4xl mx-auto">
+    <!-- Chat Container: w-full and h-full ensures it fills the available space -->
+    <div id="chat-container" class="flex-grow flex flex-col bg-white overflow-hidden max-w-full mx-auto shadow-xl">
 
-        <!-- Header -->
-        <header class="p-4 bg-gray-900 text-white shadow-lg flex items-center justify-between">
-            <h1 class="text-xl font-extrabold tracking-tight">Wikipedia Health Assistant</h1>
-            <!-- Lucide Stethoscope Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stethoscope"><path d="M11.3 5c.5-2.2 2.4-3.9 4.9-3.9 2.5 0 4.4 1.7 4.9 3.9"/><path d="M14 11l-3 3-2 2h4l2-2 3-3"/><path d="M14 11V3"/><path d="M14 11h-4c-1.3 0-2.5.5-3.4 1.4L4.8 14.2"/><path d="M4.8 14.2c-.8.8-1.4 2-1.4 3.4 0 2.8 2.2 5 5 5s5-2.2 5-5c0-1.3-.5-2.5-1.4-3.4L9 11"/></svg>
+        <!-- Header: Deep Navy Blue -->
+        <header class="p-4 bg-blue-900 text-white shadow-lg flex items-center justify-between">
+            <h1 class="text-xl font-extrabold tracking-tight flex items-center gap-3">
+                <!-- Lucide Stethoscope Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stethoscope"><path d="M11.3 5c.5-2.2 2.4-3.9 4.9-3.9 2.5 0 4.4 1.7 4.9 3.9"/><path d="M14 11l-3 3-2 2h4l2-2 3-3"/><path d="M14 11V3"/><path d="M14 11h-4c-1.3 0-2.5.5-3.4 1.4L4.8 14.2"/><path d="M4.8 14.2c-.8.8-1.4 2-1.4 3.4 0 2.8 2.2 5 5 5s5-2.2 5-5c0-1.3-.5-2.5-1.4-3.4L9 11"/></svg>
+                Wikipedia Health Assistant
+            </h1>
         </header>
 
-        <!-- Chat History -->
-        <div id="chat-history" class="chat-history flex-grow p-4 overflow-y-auto space-y-4">
+        <!-- Chat History: Added light background -->
+        <div id="chat-history" class="chat-history flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50">
             <!-- Welcome Message -->
             <div class="assistant-message max-w-xs md:max-w-md p-3 rounded-xl shadow">
                 <p>Hello! I'm your **Wikipedia Health Assistant**. I can look up information on medical conditions, symptoms, and diseases for educational purposes.</p>
-                <p class="mt-2 text-xs text-gray-500 font-semibold">⚠️ Always consult a healthcare professional for diagnosis or treatment. This is not medical advice.</p>
+                <p class="mt-2 text-xs text-blue-800 font-semibold">⚠️ Always consult a healthcare professional for diagnosis or treatment. This is not medical advice.</p>
             </div>
         </div>
 
@@ -91,7 +91,7 @@
         </footer>
     </div>
 
-    <!-- JavaScript for Chat Functionality (UPDATED to call Gemini API directly) -->
+    <!-- JavaScript for Chat Functionality (API logic remains the same) -->
     <script>
         const chatForm = document.getElementById('chat-form');
         const chatHistory = document.getElementById('chat-history');
@@ -113,12 +113,14 @@
         // Function to create and append a message bubble
         function appendMessage(sender, text, sourceUrl = null) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words flex flex-col ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
-            messageDiv.style.borderRadius = sender === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0';
+            // Use flex-shrink-0 to ensure the message bubble doesn't get squished
+            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words flex flex-col flex-shrink-0 ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
+            
+            // Adjusting borderRadius for a softer look
+            messageDiv.style.borderRadius = sender === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px';
             
             let content = text;
             const paragraph = document.createElement('p');
-            // Use innerHTML to handle potential markdown formatting if we decide to add it later, but textContent for now for safety.
             paragraph.textContent = content; 
             messageDiv.appendChild(paragraph);
 
@@ -126,12 +128,12 @@
                 const link = document.createElement('a');
                 link.href = sourceUrl;
                 link.target = '_blank';
-                link.className = 'mt-2 text-xs font-medium transition duration-150';
+                link.className = 'mt-2 text-xs font-medium transition duration-150 underline';
                 if (sender === 'assistant') {
                     // Adjust link color for assistant bubble's lighter background
-                    link.className += ' text-blue-600 hover:text-blue-800';
+                    link.className += ' text-blue-700 hover:text-blue-900';
                 } else {
-                    link.className += ' text-blue-300 hover:text-blue-200';
+                    link.className += ' text-blue-100 hover:text-white';
                 }
                 link.textContent = 'View Full Article on Wikipedia';
                 messageDiv.appendChild(link);
