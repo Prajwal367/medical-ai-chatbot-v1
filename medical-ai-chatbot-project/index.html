@@ -45,7 +45,6 @@
         }
     </style>
 </head>
-<!-- Removed w-screen/h-screen from body as per new style block, but ensuring flex layout -->
 <body class="flex flex-col">
 
     <!-- Chat Container: w-full and h-full ensures it fills the available space -->
@@ -91,7 +90,7 @@
         </footer>
     </div>
 
-    <!-- JavaScript for Chat Functionality (API logic remains the same) -->
+    <!-- JavaScript for Chat Functionality (ADDED ERROR LOGGING) -->
     <script>
         const chatForm = document.getElementById('chat-form');
         const chatHistory = document.getElementById('chat-history');
@@ -156,6 +155,10 @@
                         continue;
                     }
                     if (!response.ok) {
+                        // Log the non-successful HTTP status
+                        console.error('API Call Status Error:', response.status, response.statusText);
+                        const errorText = await response.text();
+                        console.error('API Error Response Body:', errorText);
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response;
@@ -190,10 +193,13 @@
                 
                 const payload = {
                     contents: [{ parts: [{ text: userQuery }] }],
-                    // Enable Google Search grounding to ensure real-time, cited information
+                    // Enable Google Search grounding
                     tools: [{ "google_search": {} }],
                     systemInstruction: { parts: [{ text: systemInstruction }] },
                 };
+                
+                // IMPORTANT: Log the full API URL being used
+                console.log("Attempting API call to:", apiUrl.replace(`?key=${apiKey}`, '...'));
 
                 // 3. Fetch response from Gemini API directly
                 const response = await fetchWithRetry(apiUrl, {
@@ -206,7 +212,7 @@
                 const result = await response.json();
 
                 const candidate = result.candidates?.[0];
-                let assistantResponseText = '⚠️ I could not process your query. Please check the console for errors or try again.';
+                let assistantResponseText = '⚠️ I could not process your query. The response structure was unexpected.';
                 let sourceUrl = null;
 
                 if (candidate && candidate.content?.parts?.[0]?.text) {
@@ -233,9 +239,14 @@
                 appendMessage('assistant', assistantResponseText, sourceUrl);
 
             } catch (error) {
-                console.error('Gemini API call failed:', error);
-                // Display the same generic error message for user experience consistency
-                appendMessage('assistant', '🚨 There was a problem connecting to the assistant. Please try again.');
+                // --- CRITICAL DEBUGGING SECTION ---
+                console.error('--- FATAL ERROR DURING API CALL ---');
+                console.error('Check the Network tab in your browser console for details on the failed request.');
+                console.error('Full Error Object:', error);
+                // ------------------------------------
+
+                // Display a clear error message to the user
+                appendMessage('assistant', '🚨 Network/API Error: The connection failed. Please check the Developer Console for details on the error (F12 or Inspect > Console).');
             } finally {
                 // 6. Reset loading state
                 submitButton.disabled = false;
