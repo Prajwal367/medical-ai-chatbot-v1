@@ -3,279 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Health Assistant</title>
-    
+    <title>Wikipedia Health Assistant</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Ensure HTML and Body take up the full viewport height */
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden; 
+        /* Set the overall document background and font */
+        body {
             font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
         }
-        
-        /* Custom scrollbar styling for the chat window */
-        #chat-window::-webkit-scrollbar {
+        /* Custom scrollbar for the chat history */
+        .chat-history::-webkit-scrollbar {
             width: 8px;
         }
-        #chat-window::-webkit-scrollbar-thumb {
-            background-color: #93c5fd; /* Light Blue/Cyan */
+        .chat-history::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
             border-radius: 4px;
         }
-        #chat-window::-webkit-scrollbar-track {
-            background: #eef2ff; /* Very light background */
+        .chat-history::-webkit-scrollbar-track {
+            background: #f3f4f6;
         }
-
-        /* Loading indicator for the dots */
-        @keyframes blink {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
+        /* Style for the user message bubble */
+        .user-message {
+            background-color: #3b82f6; /* Blue for user */
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
         }
-        .loader span {
-            animation: blink 1s infinite;
+        /* Style for the assistant message bubble */
+        .assistant-message {
+            background-color: #e5e7eb; /* Light gray for assistant */
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+        }
+        /* Hide outline on focus for accessibility */
+        input:focus, button:focus {
+            outline: none;
+            box-shadow: none;
         }
     </style>
 </head>
-<body class="bg-gray-100 font-sans antialiased h-screen flex p-0"> 
+<body class="w-screen h-screen flex items-center justify-center p-0 md:p-4">
 
-    <div class="flex flex-col bg-white w-full h-full rounded-none overflow-hidden">
-        
+    <!-- Chat Container -->
+    <!-- This div uses w-full h-full on mobile (no padding/margin) and max-width/height on desktop -->
+    <div id="chat-container" class="w-full h-full flex flex-col bg-white shadow-none md:shadow-2xl md:rounded-xl overflow-hidden max-w-xl md:max-w-3xl lg:max-w-4xl md:h-[90vh]">
+
         <!-- Header -->
-        <header class="flex items-center justify-between p-4 bg-blue-700 text-white rounded-t-none shadow-lg flex-shrink-0">
-            <h1 class="text-xl font-bold flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Health Assistant
-            </h1>
-            <span class="text-sm font-light opacity-80">Fact Finder Project</span>
+        <header class="p-4 bg-gray-800 text-white shadow-md flex items-center justify-between">
+            <h1 class="text-lg font-bold">Wikipedia Health Assistant</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stethoscope"><path d="M11.3 5c.5-2.2 2.4-3.9 4.9-3.9 2.5 0 4.4 1.7 4.9 3.9"/><path d="M14 11l-3 3-2 2h4l2-2 3-3"/><path d="M14 11V3"/><path d="M14 11h-4c-1.3 0-2.5.5-3.4 1.4L4.8 14.2"/><path d="M4.8 14.2c-.8.8-1.4 2-1.4 3.4 0 2.8 2.2 5 5 5s5-2.2 5-5c0-1.3-.5-2.5-1.4-3.4L9 11"/></svg>
         </header>
 
-        <!-- Disclaimer -->
-        <div id="disclaimer" class="p-3 bg-yellow-200 text-yellow-800 text-xs font-medium border-l-4 border-yellow-500 flex-shrink-0">
-            <span class="font-bold">MANDATORY WARNING:</span> This tool uses Wikipedia and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
-        </div>
-
-        <!-- Chat Window -->
-        <div id="chat-window" class="flex-grow p-4 space-y-4 overflow-y-auto bg-gray-50">
-            <!-- Initial Greeting -->
-            <div class="flex justify-start">
-                <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
-                    <p class="font-medium">Hello! I am a **Wikipedia Health Assistant**.</p>
-                    <p class="mt-1">I can provide quick, sourced summaries from Wikipedia. ***What health topic would you like to search for?***</p>
-                    <p class="mt-2 text-xs italic text-blue-700">Please start by asking a general health question (e.g., "seasonal allergies," "benefits of walking," or "what is an aneurysm?").</p>
-                </div>
+        <!-- Chat History -->
+        <div id="chat-history" class="chat-history flex-grow p-4 overflow-y-auto space-y-4">
+            <!-- Welcome Message -->
+            <div class="assistant-message max-w-xs md:max-w-md p-3 rounded-xl shadow">
+                <p>Hello! I'm your **Wikipedia Health Assistant**. I can look up information on medical conditions, symptoms, and diseases for educational purposes.</p>
+                <p class="mt-2 text-sm text-gray-500">**Disclaimer:** I am not a substitute for professional medical advice. Always consult a healthcare professional for diagnosis or treatment.</p>
             </div>
-            <!-- Messages go here -->
         </div>
 
-        <!-- Input Form -->
-        <form id="chat-form" class="flex p-4 bg-white border-t border-gray-200 flex-shrink-0">
-            <input 
-                type="text" 
-                id="user-input" 
-                placeholder="Search for a health topic..." 
-                class="flex-grow p-3 border border-gray-300 rounded-full focus:outline-none focus:border-blue-500 transition duration-150 shadow-inner" 
-                required
-            />
-            <button 
-                type="submit" 
-                id="send-button"
-                class="ml-3 p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 00.183.189l4.577-3.66a1 1 0 01.98-.016l3.52 1.879 2.518-2.518-2.433-4.866a1 1 0 00-.73-1.025l-2.92-.73z" />
-                </svg>
-            </button>
-        </form>
+        <!-- Input Form and Loading Indicator -->
+        <footer class="p-4 border-t border-gray-200">
+            <form id="chat-form" class="flex gap-2">
+                <input
+                    type="text"
+                    id="user-input"
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    placeholder="Ask about a medical condition (e.g., 'fever' or 'what is pneumonia')"
+                    required
+                />
+                <button
+                    type="submit"
+                    id="submit-button"
+                    class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-150 shadow-md flex items-center justify-center disabled:opacity-50"
+                >
+                    <span id="button-text">Send</span>
+                    <div id="loading-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </button>
+            </form>
+        </footer>
     </div>
 
+    <!-- JavaScript for Chat Functionality -->
     <script>
-        const chatWindow = document.getElementById('chat-window');
         const chatForm = document.getElementById('chat-form');
+        const chatHistory = document.getElementById('chat-history');
         const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
+        const submitButton = document.getElementById('submit-button');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
 
-        // Wikipedia API URL for searching and fetching summaries
-        const WIKIPEDIA_API_URL = 'https://en.wikipedia.org/w/api.php';
-        
-        // --- Core UI Functions ---
+        // This path must match the Netlify function endpoint
+        const apiUrl = '/.netlify/functions/chat';
 
-        // Utility to escape HTML for safe insertion
-        function escapeHTML(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-        }
-
-        // Add a new message bubble to the chat window
-        function addMessage(text, sender) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('flex', 'p-1');
+        // Function to create and append a message bubble
+        function appendMessage(sender, text, sourceUrl = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
+            messageDiv.style.borderRadius = sender === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0';
             
-            let bubbleClasses, textContent;
-            
-            if (sender === 'user') {
-                messageElement.classList.add('justify-end');
-                bubbleClasses = 'max-w-[85%] bg-blue-600 text-white p-3 rounded-xl rounded-br-none shadow-md';
-                textContent = escapeHTML(text);
-            } else { // 'ai' or 'error'
-                messageElement.classList.add('justify-start');
+            // Convert source URL to a clickable link
+            let content = text;
+            if (sourceUrl) {
+                // Remove the source link from the text if it's there (to avoid duplication)
+                content = text.replace(`(Source: ${sourceUrl})`, '').trim();
+
+                // Add the link to the bubble
+                const link = document.createElement('a');
+                link.href = sourceUrl;
+                link.target = '_blank';
+                link.className = 'block mt-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition duration-150';
+                link.textContent = 'View Full Article on Wikipedia';
                 
-                if (sender === 'error') {
-                    // Specific styling for the failure message
-                    bubbleClasses = 'max-w-[85%] bg-red-100 text-red-800 p-3 rounded-xl rounded-tl-none shadow-md border border-red-300';
-                    textContent = text;
-                } else {
-                    // Standard AI response styling
-                    bubbleClasses = 'max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200';
-                    textContent = text; // Content is already formatted/HTML
-                }
+                messageDiv.innerHTML = `<p>${content}</p>`;
+                messageDiv.appendChild(link);
+            } else {
+                messageDiv.innerHTML = `<p>${content}</p>`;
             }
 
-            messageElement.innerHTML = `<div class="${bubbleClasses}">${textContent}</div>`;
-            chatWindow.appendChild(messageElement);
+
+            chatHistory.appendChild(messageDiv);
             
-            // Scroll to the bottom of the chat window
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+            // Scroll to the bottom
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
-        // Add a loading indicator (dots)
-        function addLoadingIndicator() {
-            const loadingElement = document.createElement('div');
-            loadingElement.id = 'loading-indicator';
-            loadingElement.classList.add('flex', 'justify-start', 'p-1');
-            loadingElement.innerHTML = `
-                <div class="max-w-[85%] bg-blue-50 text-blue-900 p-3 rounded-xl rounded-tl-none shadow-md border border-blue-200">
-                    <span class="loader text-lg font-bold">. . .</span>
-                </div>
-            `;
-            chatWindow.appendChild(loadingElement);
-            chatWindow.scrollTop = chatWindow.scrollHeight; // Scroll to bottom
-            return loadingElement;
-        }
+        // Handle form submission
+        chatForm.addEventListener('submit', handleSubmit);
 
-        // Remove the loading indicator
-        function removeLoadingIndicator() {
-            const indicator = document.getElementById('loading-indicator');
-            if (indicator) {
-                indicator.remove();
-            }
-        }
-
-        // --- Wikipedia API Functions ---
-
-        /**
-         * Executes a Wikipedia search and returns the top article title.
-         */
-        async function searchWikipedia(searchTerm) {
-            const searchParams = new URLSearchParams({
-                action: 'query',
-                list: 'search',
-                srsearch: searchTerm, 
-                format: 'json',
-                srlimit: 1, // Only need the top result
-                origin: '*' // CRITICAL for CORS/browser requests
-            });
-
-            const searchResponse = await fetch(`${WIKIPEDIA_API_URL}?${searchParams.toString()}`);
-            const searchResult = await searchResponse.json();
-            return searchResult.query?.search?.[0]?.title || null;
-        }
-
-        /**
-         * Fetches and formats the summary from a Wikipedia article title.
-         */
-        async function fetchWikipediaSummary(title) {
-            const extractParams = new URLSearchParams({
-                action: 'query',
-                titles: title,
-                prop: 'extracts',
-                exchars: 1200, // Get up to 1200 characters of the summary
-                explaintext: 1, // Get plain text (no HTML)
-                format: 'json',
-                redirects: 1, // Follow redirects
-                origin: '*' // CRITICAL for CORS/browser requests
-            });
-
-            const extractResponse = await fetch(`${WIKIPEDIA_API_URL}?${extractParams.toString()}`);
-            const extractResult = await extractResponse.json();
-
-            const pages = extractResult.query?.pages;
-            const pageId = Object.keys(pages)[0];
-            const extract = pages[pageId]?.extract;
-
-            if (!extract) {
-                return null;
-            }
-
-            // Clean up the extract (remove excess newlines) and get the first main paragraph
-            let cleanedExtract = extract.split('\n').filter(p => p.trim() !== '')[0]; 
-            
-            // Format the final response with a link
-            const sourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`;
-            
-            let htmlContent = `<p class="font-bold text-sm">Wikipedia Result for "${title}"</p>`;
-            htmlContent += `<p class="mt-2">${cleanedExtract}</p>`;
-            htmlContent += `<p class="mt-3 text-xs italic text-blue-700">Source: <a href="${sourceUrl}" target="_blank" class="underline hover:text-blue-900">${sourceUrl}</a></p>`;
-            
-            return htmlContent;
-        }
-
-        // --- Main Submission Handler ---
-
-        async function handleSubmit(event) {
-            event.preventDefault();
+        async function handleSubmit(e) {
+            e.preventDefault();
             const prompt = userInput.value.trim();
             if (!prompt) return;
 
             // 1. Display user message
-            addMessage(prompt, 'user');
-            userInput.value = ''; // Clear input field
+            appendMessage('user', prompt);
+            userInput.value = '';
 
-            // 2. Disable input and show loading
-            sendButton.disabled = true;
-            userInput.disabled = true;
-            const loadingIndicator = addLoadingIndicator();
-            
-            let responseContent = '';
-            let isError = false;
+            // 2. Show loading state
+            submitButton.disabled = true;
+            buttonText.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
 
             try {
-                // 3. Search for the best Wikipedia title
-                const title = await searchWikipedia(prompt);
+                // 3. Fetch response from Netlify function (backend)
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt }),
+                });
 
-                if (!title) {
-                    responseContent = `Disclaimer: I am a fact-finding assistant. I could not find a relevant Wikipedia article for **"${escapeHTML(prompt)}"**. Please try a more specific health term.`;
-                    isError = true;
-                } else {
-                    // 4. Fetch the summary using the title
-                    const summaryHtml = await fetchWikipediaSummary(title);
-                    if (summaryHtml) {
-                        responseContent = `Disclaimer: I am a fact-finding assistant, not a doctor. ${summaryHtml}`;
-                    } else {
-                        responseContent = `Disclaimer: I am a fact-finding assistant. Found article "${title}" but could not extract a summary.`;
-                        isError = true;
-                    }
+                // 4. Check for HTTP errors (e.g., 404, 500)
+                if (!response.ok) {
+                    throw new Error(`Server failed: HTTP Status ${response.status}. Could not parse server error.`);
                 }
 
-            } catch (error) {
-                // 5. Handle network or API failure
-                console.error("Wikipedia fetch failed:", error);
-                responseContent = `Disclaimer: I am a fact-finding assistant. An internal error occurred while trying to connect to the Wikipedia API. Please check your network connection. (Error: ${error.message})`;
-                isError = true;
+                // 5. Parse JSON response
+                const data = await response.json();
 
+                let assistantResponseText;
+                let sourceUrl = null;
+
+                if (data.error) {
+                    // Handle errors returned from the function (e.g., "Not found")
+                    assistantResponseText = `⚠️ I could not find a relevant Wikipedia article for that query. Please try rephrasing your health question.`;
+                } else {
+                    // Success: Display the summary
+                    assistantResponseText = data.summary;
+                    sourceUrl = data.sourceUrl;
+                }
+
+                // 6. Display assistant message
+                appendMessage('assistant', assistantResponseText, sourceUrl);
+
+            } catch (error) {
+                console.error('Fetch failed:', error);
+                // Display a generic error message to the user
+                appendMessage('assistant', '🚨 There was a problem connecting to the assistant. Please try again.');
             } finally {
-                // 6. Display response and re-enable input
-                removeLoadingIndicator();
-                addMessage(responseContent, isError ? 'error' : 'ai');
-                sendButton.disabled = false;
-                userInput.disabled = false;
-                userInput.focus();
+                // 7. Reset loading state
+                submitButton.disabled = false;
+                buttonText.classList.remove('hidden');
+                loadingSpinner.classList.add('hidden');
             }
         }
-
-        chatForm.addEventListener('submit', handleSubmit);
     </script>
 </body>
 </html>
