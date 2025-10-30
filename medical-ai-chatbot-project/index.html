@@ -91,7 +91,7 @@
         </footer>
     </div>
 
-    <!-- JavaScript for Chat Functionality (UNCHANGED LOGIC) -->
+    <!-- JavaScript for Chat Functionality (UPDATED to call Gemini API directly) -->
     <script>
         const chatForm = document.getElementById('chat-form');
         const chatHistory = document.getElementById('chat-history');
@@ -100,8 +100,15 @@
         const buttonText = document.getElementById('button-text');
         const loadingSpinner = document.getElementById('loading-spinner');
 
-        // This path must match the Netlify function endpoint
-        const apiUrl = '/.netlify/functions/chat';
+        // --- API CONFIGURATION ---
+        const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
+        const apiKey = ""; // Leave as empty string for Canvas to provide the key
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+        // System Instruction to guide the model's behavior and grounding query
+        const systemInstruction = "You are a Wikipedia Health Assistant. Your task is to look up the user's medical query on Wikipedia, summarize the findings concisely, and state that the information is for educational purposes only. You MUST use Google Search to find a relevant Wikipedia article first, then summarize that content. The final answer must be a concise, easy-to-read summary, followed by a citation.";
+        // --- END API CONFIGURATION ---
+
 
         // Function to create and append a message bubble
         function appendMessage(sender, text, sourceUrl = null) {
@@ -111,17 +118,20 @@
             
             let content = text;
             const paragraph = document.createElement('p');
-            paragraph.textContent = content;
+            // Use innerHTML to handle potential markdown formatting if we decide to add it later, but textContent for now for safety.
+            paragraph.textContent = content; 
             messageDiv.appendChild(paragraph);
 
             if (sourceUrl) {
                 const link = document.createElement('a');
                 link.href = sourceUrl;
                 link.target = '_blank';
-                link.className = 'mt-2 text-xs font-medium text-blue-300 hover:text-blue-200 transition duration-150';
+                link.className = 'mt-2 text-xs font-medium transition duration-150';
                 if (sender === 'assistant') {
                     // Adjust link color for assistant bubble's lighter background
-                    link.className = 'mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition duration-150';
+                    link.className += ' text-blue-600 hover:text-blue-800';
+                } else {
+                    link.className += ' text-blue-300 hover:text-blue-200';
                 }
                 link.textContent = 'View Full Article on Wikipedia';
                 messageDiv.appendChild(link);
@@ -131,6 +141,28 @@
             
             // Scroll to the bottom
             chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Exponential backoff retry function
+        async function fetchWithRetry(url, options, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 && i < retries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
         }
 
         // Handle form submission
@@ -151,42 +183,59 @@
             loadingSpinner.classList.remove('hidden');
 
             try {
-                // 3. Fetch response from Netlify function (backend)
-                const response = await fetch(apiUrl, {
+                // Construct the prompt for the model
+                const userQuery = `Search Wikipedia for '${prompt}' and provide a concise summary of the medical/health information found.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    // Enable Google Search grounding to ensure real-time, cited information
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                };
+
+                // 3. Fetch response from Gemini API directly
+                const response = await fetchWithRetry(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt }),
+                    body: JSON.stringify(payload)
                 });
 
-                // 4. Check for HTTP errors (e.g., 404, 500)
-                if (!response.ok) {
-                    throw new Error(`Server failed: HTTP Status ${response.status}. Could not parse server error.`);
-                }
+                // 4. Parse JSON response
+                const result = await response.json();
 
-                // 5. Parse JSON response
-                const data = await response.json();
-
-                let assistantResponseText;
+                const candidate = result.candidates?.[0];
+                let assistantResponseText = '⚠️ I could not process your query. Please check the console for errors or try again.';
                 let sourceUrl = null;
 
-                if (data.error) {
-                    // Handle errors returned from the function (e.g., "Not found")
-                    assistantResponseText = `⚠️ I could not find a relevant Wikipedia article for that query, or the topic is not health-related. Please try rephrasing your medical question.`;
-                } else {
-                    // Success: Display the summary
-                    assistantResponseText = data.summary;
-                    sourceUrl = data.sourceUrl;
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    assistantResponseText = candidate.content.parts[0].text;
+                    
+                    // Extract grounding sources (citations)
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        // Look for a source that is likely from Wikipedia
+                        const wikipediaSource = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .find(source => source.uri && source.uri.includes('wikipedia.org'));
+                        
+                        if (wikipediaSource) {
+                            sourceUrl = wikipediaSource.uri;
+                        }
+                    }
                 }
 
-                // 6. Display assistant message
+                // 5. Display assistant message
                 appendMessage('assistant', assistantResponseText, sourceUrl);
 
             } catch (error) {
-                console.error('Fetch failed:', error);
-                // Display a generic error message to the user
+                console.error('Gemini API call failed:', error);
+                // Display the same generic error message for user experience consistency
                 appendMessage('assistant', '🚨 There was a problem connecting to the assistant. Please try again.');
             } finally {
-                // 7. Reset loading state
+                // 6. Reset loading state
                 submitButton.disabled = false;
                 buttonText.classList.remove('hidden');
                 loadingSpinner.classList.add('hidden');
