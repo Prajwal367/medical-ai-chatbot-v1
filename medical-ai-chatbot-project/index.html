@@ -10,32 +10,33 @@
         /* Set the overall document background and font */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Light gray background */
+            background-color: #f0f4f8; /* Light blue-gray background */
         }
         /* Custom scrollbar for the chat history */
         .chat-history::-webkit-scrollbar {
             width: 8px;
         }
         .chat-history::-webkit-scrollbar-thumb {
-            background-color: #d1d5db;
+            background-color: #94a3b8; /* Smoother gray scrollbar */
             border-radius: 4px;
         }
         .chat-history::-webkit-scrollbar-track {
-            background: #f3f4f6;
+            background: #f0f4f8;
         }
         /* Style for the user message bubble */
         .user-message {
-            background-color: #3b82f6; /* Blue for user */
+            background-color: #2563eb; /* Darker Blue for user */
             color: white;
             align-self: flex-end;
             border-bottom-right-radius: 0;
         }
         /* Style for the assistant message bubble */
         .assistant-message {
-            background-color: #e5e7eb; /* Light gray for assistant */
+            background-color: #f8fafc; /* Near-white for assistant */
             color: #1f2937;
             align-self: flex-start;
             border-bottom-left-radius: 0;
+            border: 1px solid #e2e8f0; /* Subtle border */
         }
         /* Hide outline on focus for accessibility */
         input:focus, button:focus {
@@ -44,15 +45,17 @@
         }
     </style>
 </head>
+<!-- Full-screen width and height on all devices (w-screen h-screen) -->
 <body class="w-screen h-screen flex items-center justify-center p-0 md:p-4">
 
     <!-- Chat Container -->
-    <!-- This div uses w-full h-full on mobile (no padding/margin) and max-width/height on desktop -->
+    <!-- Max width on desktop, full width/height on mobile -->
     <div id="chat-container" class="w-full h-full flex flex-col bg-white shadow-none md:shadow-2xl md:rounded-xl overflow-hidden max-w-xl md:max-w-3xl lg:max-w-4xl md:h-[90vh]">
 
         <!-- Header -->
-        <header class="p-4 bg-gray-800 text-white shadow-md flex items-center justify-between">
-            <h1 class="text-lg font-bold">Wikipedia Health Assistant</h1>
+        <header class="p-4 bg-gray-900 text-white shadow-lg flex items-center justify-between">
+            <h1 class="text-xl font-extrabold tracking-tight">Wikipedia Health Assistant</h1>
+            <!-- Lucide Stethoscope Icon -->
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stethoscope"><path d="M11.3 5c.5-2.2 2.4-3.9 4.9-3.9 2.5 0 4.4 1.7 4.9 3.9"/><path d="M14 11l-3 3-2 2h4l2-2 3-3"/><path d="M14 11V3"/><path d="M14 11h-4c-1.3 0-2.5.5-3.4 1.4L4.8 14.2"/><path d="M4.8 14.2c-.8.8-1.4 2-1.4 3.4 0 2.8 2.2 5 5 5s5-2.2 5-5c0-1.3-.5-2.5-1.4-3.4L9 11"/></svg>
         </header>
 
@@ -61,24 +64,24 @@
             <!-- Welcome Message -->
             <div class="assistant-message max-w-xs md:max-w-md p-3 rounded-xl shadow">
                 <p>Hello! I'm your **Wikipedia Health Assistant**. I can look up information on medical conditions, symptoms, and diseases for educational purposes.</p>
-                <p class="mt-2 text-sm text-gray-500">**Disclaimer:** I am not a substitute for professional medical advice. Always consult a healthcare professional for diagnosis or treatment.</p>
+                <p class="mt-2 text-xs text-gray-500 font-semibold">⚠️ Always consult a healthcare professional for diagnosis or treatment. This is not medical advice.</p>
             </div>
         </div>
 
         <!-- Input Form and Loading Indicator -->
-        <footer class="p-4 border-t border-gray-200">
-            <form id="chat-form" class="flex gap-2">
+        <footer class="p-4 border-t border-gray-200 bg-white">
+            <form id="chat-form" class="flex gap-3">
                 <input
                     type="text"
                     id="user-input"
-                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                    class="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner"
                     placeholder="Ask about a medical condition (e.g., 'fever' or 'what is pneumonia')"
                     required
                 />
                 <button
                     type="submit"
                     id="submit-button"
-                    class="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-150 shadow-md flex items-center justify-center disabled:opacity-50"
+                    class="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition duration-150 shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <span id="button-text">Send</span>
                     <div id="loading-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -87,7 +90,7 @@
         </footer>
     </div>
 
-    <!-- JavaScript for Chat Functionality -->
+    <!-- JavaScript for Chat Functionality (UNCHANGED LOGIC) -->
     <script>
         const chatForm = document.getElementById('chat-form');
         const chatHistory = document.getElementById('chat-history');
@@ -102,28 +105,26 @@
         // Function to create and append a message bubble
         function appendMessage(sender, text, sourceUrl = null) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
+            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words flex flex-col ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
             messageDiv.style.borderRadius = sender === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0';
             
-            // Convert source URL to a clickable link
             let content = text;
-            if (sourceUrl) {
-                // Remove the source link from the text if it's there (to avoid duplication)
-                content = text.replace(`(Source: ${sourceUrl})`, '').trim();
+            const paragraph = document.createElement('p');
+            paragraph.textContent = content;
+            messageDiv.appendChild(paragraph);
 
-                // Add the link to the bubble
+            if (sourceUrl) {
                 const link = document.createElement('a');
                 link.href = sourceUrl;
                 link.target = '_blank';
-                link.className = 'block mt-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition duration-150';
+                link.className = 'mt-2 text-xs font-medium text-blue-300 hover:text-blue-200 transition duration-150';
+                if (sender === 'assistant') {
+                    // Adjust link color for assistant bubble's lighter background
+                    link.className = 'mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 transition duration-150';
+                }
                 link.textContent = 'View Full Article on Wikipedia';
-                
-                messageDiv.innerHTML = `<p>${content}</p>`;
                 messageDiv.appendChild(link);
-            } else {
-                messageDiv.innerHTML = `<p>${content}</p>`;
             }
-
 
             chatHistory.appendChild(messageDiv);
             
@@ -169,7 +170,7 @@
 
                 if (data.error) {
                     // Handle errors returned from the function (e.g., "Not found")
-                    assistantResponseText = `⚠️ I could not find a relevant Wikipedia article for that query. Please try rephrasing your health question.`;
+                    assistantResponseText = `⚠️ I could not find a relevant Wikipedia article for that query, or the topic is not health-related. Please try rephrasing your medical question.`;
                 } else {
                     // Success: Display the summary
                     assistantResponseText = data.summary;
