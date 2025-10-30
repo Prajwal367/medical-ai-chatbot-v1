@@ -1,5 +1,0 @@
-[build]
-
-This line tells Netlify that all serverless functions are located inside the 'netlify/functions' directory.
-
-functions = "netlify/functions"
