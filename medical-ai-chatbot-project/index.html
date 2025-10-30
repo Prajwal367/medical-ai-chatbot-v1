@@ -45,12 +45,13 @@
         }
     </style>
 </head>
-<!-- Full-screen width and height on all devices (w-screen h-screen) -->
-<body class="w-screen h-screen flex items-center justify-center p-0 md:p-4">
+<!-- Removed centered justify-center and padding (p-0 md:p-4) to ensure full screen usage -->
+<body class="w-screen h-screen flex">
 
     <!-- Chat Container -->
+    <!-- Removed md:h-[90vh] to force full height on all screens/containers -->
     <!-- Max width on desktop, full width/height on mobile -->
-    <div id="chat-container" class="w-full h-full flex flex-col bg-white shadow-none md:shadow-2xl md:rounded-xl overflow-hidden max-w-xl md:max-w-3xl lg:max-w-4xl md:h-[90vh]">
+    <div id="chat-container" class="w-full h-full flex flex-col bg-white shadow-none md:shadow-2xl md:rounded-xl overflow-hidden max-w-full md:max-w-3xl lg:max-w-4xl mx-auto">
 
         <!-- Header -->
         <header class="p-4 bg-gray-900 text-white shadow-lg flex items-center justify-between">
