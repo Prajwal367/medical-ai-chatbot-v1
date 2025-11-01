@@ -112,10 +112,12 @@
     <script>
         // --- CONFIGURATION ---
         // Setting a custom User-Agent is crucial for Wikipedia API etiquette.
-        const WIKI_USER_AGENT = 'HealthAssistantApp/1.1 (contact@user-provided-email.com)';
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.2 (contact@user-provided-email.com)';
         const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
         const chatWindow = document.getElementById('chat-window');
         const searchInput = document.getElementById('searchInput');
+        const GREETINGS = ['hi', 'hello', 'hey', 'good morning', 'good afternoon'];
+
 
         /**
          * Utility function to scroll the chat window to the bottom.
@@ -145,9 +147,34 @@
             scrollToBottom();
             return bubble; // Return the bubble element for later updates (e.g., loading state)
         }
+        
+        /**
+         * Responds to common greetings.
+         * @param {string} query The user's input.
+         * @returns {boolean} True if a greeting was handled, false otherwise.
+         */
+        function handleGreeting(query) {
+            const normalizedQuery = query.toLowerCase();
+            
+            // Check if the query starts with or is exactly a greeting
+            const isGreeting = GREETINGS.some(greeting => 
+                normalizedQuery === greeting || normalizedQuery.startsWith(greeting + ' ')
+            );
+
+            if (isGreeting) {
+                const response = `
+                    <p class="font-bold text-lg text-blue-800 mb-2">Hello! How can I assist you with your health query today?</p>
+                    <p class="text-gray-700 leading-relaxed">Remember, I use Wikipedia for information. For example, try asking: "What are the common symptoms of influenza?"</p>
+                `;
+                addMessage(response, 'assistant');
+                return true;
+            }
+            return false;
+        }
+
 
         /**
-         * Handles user input: adds user bubble and starts the search.
+         * Handles user input: adds user bubble and starts the search or handles a greeting.
          */
         function handleUserInput() {
             const query = searchInput.value.trim();
@@ -161,7 +188,16 @@
             searchInput.disabled = true;
             document.getElementById('searchButton').disabled = true;
 
-            // 3. Start search
+            // 3. Handle Greeting
+            if (handleGreeting(query)) {
+                 // Re-enable input if greeting was handled
+                searchInput.disabled = false;
+                document.getElementById('searchButton').disabled = false;
+                searchInput.focus();
+                return;
+            }
+
+            // 4. Start search
             searchWikipedia(query);
         }
 
@@ -191,15 +227,16 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Searching Wikipedia...</span>
+                    <span>Searching Wikipedia for medical information...</span>
                 </div>
             `;
             const loadingBubble = addMessage(loadingHtml, 'assistant');
 
-            // We combine the user's query with a bias towards medical articles
-            // By prefixing the search with a category filter for "Category:Health" (though not fully reliable)
-            // The main strategy is the srsearch parameter handles sentence structure better.
-            const searchTerms = `${query} category:Health OR category:Medicine`; 
+            // --- IMPROVED MEDICAL FOCUS ---
+            // Only search within medical categories to force relevance.
+            // This is the most effective way to filter general Wikipedia search.
+            // We use the full query as the search term, relying on srsearch to handle the sentence structure.
+            const searchTerms = `${query} category:Health OR category:Medicine OR category:Diseases`; 
             
             const params = new URLSearchParams({
                 action: 'query',
