@@ -3,255 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wikipedia Health Assistant</title>
+    <title>Health Assistant</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Set the overall document background and font */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #ffffff; /* Clean white background for full canvas */
+        /* Custom font */
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Ensure the body fills the entire viewport and stacks elements */
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-y: hidden; /* Prevent body scroll */
         }
-        /* Custom scrollbar for the chat history */
-        .chat-history::-webkit-scrollbar {
-            width: 8px;
-        }
-        .chat-history::-webkit-scrollbar-thumb {
-            background-color: #93c5fd; /* Soft blue scrollbar */
-            border-radius: 4px;
-        }
-        .chat-history::-webkit-scrollbar-track {
-            background: #f1f5f9; /* Light track */
-        }
-        /* Style for the user message bubble */
-        .user-message {
-            background-color: #2563eb; /* Strong Blue for user */
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px; /* More modern, slightly less aggressive corner */
-        }
-        /* Style for the assistant message bubble */
-        .assistant-message {
-            background-color: #e0f2fe; /* Very light blue for contrast and comfort */
-            color: #1f2937;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-            border: 1px solid #bfdbfe; /* Subtle light blue border */
-        }
-        /* Ensure the body and html take up full height of the viewport */
-        html, body, #chat-container {
-            height: 100%;
+
+        /* Styling for the main chat window area */
+        #chat-window {
+            flex-grow: 1; /* Allows the chat area to fill available space */
+            overflow-y: auto; /* Enables vertical scrolling within the chat */
+            padding: 1.5rem;
+            max-width: 1000px; /* Optional: Limit width on large screens */
             width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Blue chat bubble (User) */
+        .user-bubble {
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            color: white;
+            border-radius: 1rem 0.5rem 0.5rem 1rem;
+            max-width: 60%;
+            margin-left: auto;
+        }
+
+        /* Light blue chat bubble (Assistant/Result) */
+        .assistant-bubble {
+            background-color: #eff6ff; /* Tailwind blue-50 */
+            color: #1f2937; /* Tailwind gray-800 */
+            border-radius: 0.5rem 1rem 1rem 0.5rem;
+            max-width: 75%;
+            margin-right: auto;
+            border: 1px solid #bfdbfe; /* Tailwind blue-200 */
         }
     </style>
 </head>
-<body class="flex flex-col">
+<body class="bg-gray-100 app-layout">
 
-    <!-- Chat Container: w-full and h-full ensures it fills the available space -->
-    <div id="chat-container" class="flex-grow flex flex-col bg-white overflow-hidden max-w-full mx-auto shadow-xl">
-
-        <!-- Header: Deep Navy Blue -->
-        <header class="p-4 bg-blue-900 text-white shadow-lg flex items-center justify-between">
-            <h1 class="text-xl font-extrabold tracking-tight flex items-center gap-3">
-                <!-- Lucide Stethoscope Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-stethoscope"><path d="M11.3 5c.5-2.2 2.4-3.9 4.9-3.9 2.5 0 4.4 1.7 4.9 3.9"/><path d="M14 11l-3 3-2 2h4l2-2 3-3"/><path d="M14 11V3"/><path d="M14 11h-4c-1.3 0-2.5.5-3.4 1.4L4.8 14.2"/><path d="M4.8 14.2c-.8.8-1.4 2-1.4 3.4 0 2.8 2.2 5 5 5s5-2.2 5-5c0-1.3-.5-2.5-1.4-3.4L9 11"/></svg>
-                Wikipedia Health Assistant
-            </h1>
-        </header>
-
-        <!-- Chat History: Added light background -->
-        <div id="chat-history" class="chat-history flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50">
-            <!-- Welcome Message -->
-            <div class="assistant-message max-w-xs md:max-w-md p-3 rounded-xl shadow">
-                <p>Hello! I'm your **Wikipedia Health Assistant**. I can look up information on medical conditions, symptoms, and diseases for educational purposes.</p>
-                <p class="mt-2 text-xs text-blue-800 font-semibold">⚠️ Always consult a healthcare professional for diagnosis or treatment. This is not medical advice.</p>
-            </div>
+    <!-- 1. Header (Top Blue Banner) -->
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-center sticky top-0 z-10">
+        <div class="w-full max-w-4xl flex justify-between items-center">
+            <h1 class="text-xl font-bold">HEALTH ASSISTANT</h1>
+            <span class="text-sm font-medium opacity-80">Fact Finder Project</span>
         </div>
+    </header>
 
-        <!-- Input Form and Loading Indicator -->
-        <footer class="p-4 border-t border-gray-200 bg-white">
-            <form id="chat-form" class="flex gap-3">
-                <input
-                    type="text"
-                    id="user-input"
-                    class="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-inner"
-                    placeholder="Ask about a medical condition (e.g., 'fever' or 'what is pneumonia')"
-                    required
-                />
-                <button
-                    type="submit"
-                    id="submit-button"
-                    class="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition duration-150 shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <span id="button-text">Send</span>
-                    <div id="loading-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                </button>
-            </form>
-        </footer>
+    <!-- 2. Mandatory Warning Disclaimer (Yellow Banner) -->
+    <div class="bg-yellow-100 text-yellow-800 text-sm font-medium p-3 flex justify-center w-full shadow-inner sticky top-16 z-10">
+        <div class="w-full max-w-4xl">
+            <strong class="uppercase mr-2">Mandatory Warning:</strong> This tool uses Wikipedia and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
+        </div>
     </div>
 
-    <!-- JavaScript for Chat Functionality (ADDED ERROR LOGGING) -->
+    <!-- 3. Chat Window (Scrollable Content Area) -->
+    <div id="chat-window" class="space-y-6 pt-6 pb-24">
+        
+        <!-- ASSISTANT: Initial Welcome Message -->
+        <div class="flex justify-start">
+            <div class="assistant-bubble p-4 shadow-lg">
+                <p class="font-bold text-lg text-blue-800 mb-2">Hello! I am a **Wikipedia Health Assistant**.</p>
+                <p>I can provide quick, sourced summaries from Wikipedia. ***What health topic would you like to search for?***</p>
+                <p class="text-xs mt-2 text-gray-500">Please start by asking a general health question (e.g., "seasonal allergies," "benefits of walking," or "what is an aneurysm?").</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 4. Input Footer (Fixed Bottom Bar) -->
+    <div id="input-footer" class="bg-white p-4 border-t border-gray-200 sticky bottom-0 z-20 flex justify-center w-full">
+        <div class="w-full max-w-4xl flex gap-3">
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Search for a health topic..." 
+                class="flex-grow p-3 border-2 border-gray-300 rounded-full focus:ring-teal-500 focus:border-teal-500 transition duration-200 text-base shadow-inner"
+                onkeydown="if(event.key === 'Enter') handleUserInput()"
+            >
+            <button 
+                id="searchButton" 
+                onclick="handleUserInput()" 
+                class="bg-blue-600 text-white w-12 h-12 rounded-full font-bold hover:bg-blue-700 transition duration-200 shadow-xl active:scale-95 transform flex items-center justify-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" transform="rotate(90 12 12) translate(0 0) scale(-1 1)" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+
     <script>
-        const chatForm = document.getElementById('chat-form');
-        const chatHistory = document.getElementById('chat-history');
-        const userInput = document.getElementById('user-input');
-        const submitButton = document.getElementById('submit-button');
-        const buttonText = document.getElementById('button-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
+        // --- CONFIGURATION ---
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.0 (contact@user-provided-email.com)';
+        const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
+        const chatWindow = document.getElementById('chat-window');
+        const searchInput = document.getElementById('searchInput');
 
-        // --- API CONFIGURATION ---
-        const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
-        const apiKey = ""; // Leave as empty string for Canvas to provide the key
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-
-        // System Instruction to guide the model's behavior and grounding query
-        const systemInstruction = "You are a Wikipedia Health Assistant. Your task is to look up the user's medical query on Wikipedia, summarize the findings concisely, and state that the information is for educational purposes only. You MUST use Google Search to find a relevant Wikipedia article first, then summarize that content. The final answer must be a concise, easy-to-read summary, followed by a citation.";
-        // --- END API CONFIGURATION ---
-
-
-        // Function to create and append a message bubble
-        function appendMessage(sender, text, sourceUrl = null) {
-            const messageDiv = document.createElement('div');
-            // Use flex-shrink-0 to ensure the message bubble doesn't get squished
-            messageDiv.className = `max-w-xs md:max-w-md p-3 rounded-xl shadow break-words flex flex-col flex-shrink-0 ${sender === 'user' ? 'user-message self-end' : 'assistant-message self-start'}`;
-            
-            // Adjusting borderRadius for a softer look
-            messageDiv.style.borderRadius = sender === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px';
-            
-            let content = text;
-            const paragraph = document.createElement('p');
-            paragraph.textContent = content; 
-            messageDiv.appendChild(paragraph);
-
-            if (sourceUrl) {
-                const link = document.createElement('a');
-                link.href = sourceUrl;
-                link.target = '_blank';
-                link.className = 'mt-2 text-xs font-medium transition duration-150 underline';
-                if (sender === 'assistant') {
-                    // Adjust link color for assistant bubble's lighter background
-                    link.className += ' text-blue-700 hover:text-blue-900';
-                } else {
-                    link.className += ' text-blue-100 hover:text-white';
-                }
-                link.textContent = 'View Full Article on Wikipedia';
-                messageDiv.appendChild(link);
-            }
-
-            chatHistory.appendChild(messageDiv);
-            
-            // Scroll to the bottom
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+        /**
+         * Utility function to scroll the chat window to the bottom.
+         */
+        function scrollToBottom() {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
         }
 
-        // Exponential backoff retry function
-        async function fetchWithRetry(url, options, retries = 3) {
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url, options);
-                    if (response.status === 429 && i < retries - 1) {
-                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        continue;
-                    }
-                    if (!response.ok) {
-                        // Log the non-successful HTTP status
-                        console.error('API Call Status Error:', response.status, response.statusText);
-                        const errorText = await response.text();
-                        console.error('API Error Response Body:', errorText);
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response;
-                } catch (error) {
-                    if (i === retries - 1) throw error;
-                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
+        /**
+         * Adds a message bubble to the chat window.
+         * @param {string} content - The HTML content to display inside the bubble.
+         * @param {string} type - 'user' or 'assistant'.
+         */
+        function addMessage(content, type) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${type === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `${type === 'user' ? 'user-bubble' : 'assistant-bubble'} p-4 shadow-md`;
+            bubble.innerHTML = content;
+            
+            wrapper.appendChild(bubble);
+            chatWindow.appendChild(wrapper);
+            scrollToBottom();
         }
 
-        // Handle form submission
-        chatForm.addEventListener('submit', handleSubmit);
+        /**
+         * Handles user input: adds user bubble and starts the search.
+         */
+        function handleUserInput() {
+            const query = searchInput.value.trim();
+            if (!query) return;
 
-        async function handleSubmit(e) {
-            e.preventDefault();
-            const prompt = userInput.value.trim();
-            if (!prompt) return;
+            // 1. Add user's message bubble
+            addMessage(query, 'user');
+            
+            // 2. Clear input and disable for loading
+            searchInput.value = '';
+            searchInput.disabled = true;
+            document.getElementById('searchButton').disabled = true;
 
-            // 1. Display user message
-            appendMessage('user', prompt);
-            userInput.value = '';
+            // 3. Start search
+            searchWikipedia(query);
+        }
 
-            // 2. Show loading state
-            submitButton.disabled = true;
-            buttonText.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden');
+        /**
+         * Converts the plain text snippet from the API.
+         * @param {string} snippet The raw HTML snippet from the API.
+         * @returns {string} Cleaned HTML string.
+         */
+        const cleanSnippet = (snippet) => {
+            // Highlight search matches with a prominent color
+            let cleaned = snippet
+                .replace(/<span class="searchmatch">/g, '<strong class="text-teal-700 font-semibold">')
+                .replace(/<\/span>/g, '</strong>');
+            return cleaned;
+        };
+        
+        /**
+         * Performs the search against the Wikipedia API and displays the result as an assistant message.
+         * @param {string} query The search term.
+         */
+        async function searchWikipedia(query) {
+            
+            // Temporary loading message (like the screenshot's empty bubble)
+            const loadingHtml = `
+                <div class="flex items-center space-x-2 text-gray-500">
+                    <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Searching Wikipedia...</span>
+                </div>
+            `;
+            addMessage(loadingHtml, 'assistant');
+            const loadingBubble = chatWindow.lastChild.querySelector('.assistant-bubble');
+
+            const params = new URLSearchParams({
+                action: 'query',
+                list: 'search',
+                srsearch: query,
+                format: 'json',
+                origin: '*' 
+            });
 
             try {
-                // Construct the prompt for the model
-                const userQuery = `Search Wikipedia for '${prompt}' and provide a concise summary of the medical/health information found.`;
-                
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    // Enable Google Search grounding
-                    tools: [{ "google_search": {} }],
-                    systemInstruction: { parts: [{ text: systemInstruction }] },
-                };
-                
-                // IMPORTANT: Log the full API URL being used
-                console.log("Attempting API call to:", apiUrl.replace(`?key=${apiKey}`, '...'));
-
-                // 3. Fetch response from Gemini API directly
-                const response = await fetchWithRetry(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                const response = await fetch(`${WIKI_API_URL}?${params.toString()}`, {
+                    method: 'GET',
+                    headers: { 'Api-User-Agent': WIKI_USER_AGENT }
                 });
 
-                // 4. Parse JSON response
-                const result = await response.json();
-
-                const candidate = result.candidates?.[0];
-                let assistantResponseText = '⚠️ I could not process your query. The response structure was unexpected.';
-                let sourceUrl = null;
-
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    assistantResponseText = candidate.content.parts[0].text;
-                    
-                    // Extract grounding sources (citations)
-                    const groundingMetadata = candidate.groundingMetadata;
-                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
-                        // Look for a source that is likely from Wikipedia
-                        const wikipediaSource = groundingMetadata.groundingAttributions
-                            .map(attribution => ({
-                                uri: attribution.web?.uri,
-                                title: attribution.web?.title,
-                            }))
-                            .find(source => source.uri && source.uri.includes('wikipedia.org'));
-                        
-                        if (wikipediaSource) {
-                            sourceUrl = wikipediaSource.uri;
-                        }
-                    }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                // 5. Display assistant message
-                appendMessage('assistant', assistantResponseText, sourceUrl);
+                const data = await response.json();
+                const searchResults = data.query.search;
+                
+                let resultHtml;
+
+                if (searchResults && searchResults.length > 0) {
+                    const result = searchResults[0]; // Display the top result
+                    const snippetHtml = cleanSnippet(result.snippet);
+                    
+                    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, '_'))}`;
+
+                    resultHtml = `
+                        <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                        <h4 class="font-bold text-lg text-blue-700 mb-2">Wikipedia Result for "${result.title}"</h4>
+                        <p class="text-gray-700 leading-relaxed">${snippetHtml}</p>
+                        <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">${wikiUrl}</a></p>
+                    `;
+                } else {
+                    resultHtml = `
+                        <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                        <p class="font-bold text-lg text-blue-700 mb-2">No Wikipedia Result</p>
+                        <p class="text-gray-700">No general health articles found for "${query}". Please try a different term.</p>
+                    `;
+                }
+                
+                // Replace loading bubble content with results
+                loadingBubble.innerHTML = resultHtml;
 
             } catch (error) {
-                // --- CRITICAL DEBUGGING SECTION ---
-                console.error('--- FATAL ERROR DURING API CALL ---');
-                console.error('Check the Network tab in your browser console for details on the failed request.');
-                console.error('Full Error Object:', error);
-                // ------------------------------------
-
-                // Display a clear error message to the user
-                appendMessage('assistant', '🚨 Network/API Error: The connection failed. Please check the Developer Console for details on the error (F12 or Inspect > Console).');
+                console.error('Wikipedia API Error:', error);
+                
+                // Replace loading bubble content with error message
+                loadingBubble.innerHTML = `
+                    <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">System Error</p>
+                    <p class="text-red-700">An unexpected error occurred while fetching data. Please check your connection.</p>
+                `;
             } finally {
-                // 6. Reset loading state
-                submitButton.disabled = false;
-                buttonText.classList.remove('hidden');
-                loadingSpinner.classList.add('hidden');
+                // Re-enable input
+                searchInput.disabled = false;
+                document.getElementById('searchButton').disabled = false;
+                searchInput.focus();
+                scrollToBottom();
             }
         }
     </script>
