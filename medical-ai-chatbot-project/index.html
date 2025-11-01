@@ -15,13 +15,14 @@
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            height: 100vh; /* Set explicit height for better flex behavior */
             overflow-y: hidden; /* Prevent body scroll */
         }
 
         /* Styling for the main chat window area */
         #chat-window {
             flex-grow: 1; /* Allows the chat area to fill available space */
-            overflow-y: auto; /* Enables vertical scrolling within the chat */
+            overflow-y: auto; /* ENSURES vertical scrolling within the chat */
             padding: 1.5rem;
             max-width: 1000px; /* Optional: Limit width on large screens */
             width: 100%;
@@ -46,6 +47,11 @@
             margin-right: auto;
             border: 1px solid #bfdbfe; /* Tailwind blue-200 */
         }
+        
+        /* Keep header and footer height stable for scrolling calculation */
+        header, #input-footer {
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body class="bg-gray-100 app-layout">
@@ -66,7 +72,8 @@
     </div>
 
     <!-- 3. Chat Window (Scrollable Content Area) -->
-    <div id="chat-window" class="space-y-6 pt-6 pb-24">
+    <!-- The padding-bottom pb-24 ensures space above the fixed footer -->
+    <div id="chat-window" class="space-y-6 pt-6 pb-6">
         
         <!-- ASSISTANT: Initial Welcome Message -->
         <div class="flex justify-start">
@@ -104,7 +111,8 @@
 
     <script>
         // --- CONFIGURATION ---
-        const WIKI_USER_AGENT = 'HealthAssistantApp/1.0 (contact@user-provided-email.com)';
+        // Setting a custom User-Agent is crucial for Wikipedia API etiquette.
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.1 (contact@user-provided-email.com)';
         const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
         const chatWindow = document.getElementById('chat-window');
         const searchInput = document.getElementById('searchInput');
@@ -113,7 +121,10 @@
          * Utility function to scroll the chat window to the bottom.
          */
         function scrollToBottom() {
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+            // Use a slight timeout to ensure DOM updates complete before scrolling
+            setTimeout(() => {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }, 50);
         }
 
         /**
@@ -132,6 +143,7 @@
             wrapper.appendChild(bubble);
             chatWindow.appendChild(wrapper);
             scrollToBottom();
+            return bubble; // Return the bubble element for later updates (e.g., loading state)
         }
 
         /**
@@ -154,7 +166,7 @@
         }
 
         /**
-         * Converts the plain text snippet from the API.
+         * Cleans the snippet, applying basic filtering and highlighting.
          * @param {string} snippet The raw HTML snippet from the API.
          * @returns {string} Cleaned HTML string.
          */
@@ -172,7 +184,7 @@
          */
         async function searchWikipedia(query) {
             
-            // Temporary loading message (like the screenshot's empty bubble)
+            // Temporary loading message
             const loadingHtml = `
                 <div class="flex items-center space-x-2 text-gray-500">
                     <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -182,13 +194,19 @@
                     <span>Searching Wikipedia...</span>
                 </div>
             `;
-            addMessage(loadingHtml, 'assistant');
-            const loadingBubble = chatWindow.lastChild.querySelector('.assistant-bubble');
+            const loadingBubble = addMessage(loadingHtml, 'assistant');
 
+            // We combine the user's query with a bias towards medical articles
+            // By prefixing the search with a category filter for "Category:Health" (though not fully reliable)
+            // The main strategy is the srsearch parameter handles sentence structure better.
+            const searchTerms = `${query} category:Health OR category:Medicine`; 
+            
             const params = new URLSearchParams({
                 action: 'query',
                 list: 'search',
-                srsearch: query,
+                srsearch: searchTerms, // Use the query, which now accepts sentences
+                srlimit: 1, // Only get the best result
+                srwhat: 'text', // Search within article text
                 format: 'json',
                 origin: '*' 
             });
@@ -224,7 +242,7 @@
                     resultHtml = `
                         <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
                         <p class="font-bold text-lg text-blue-700 mb-2">No Wikipedia Result</p>
-                        <p class="text-gray-700">No general health articles found for "${query}". Please try a different term.</p>
+                        <p class="text-gray-700">No specific health article found for your query: **"${query}"**. Please try a different term or simplify your question.</p>
                     `;
                 }
                 
@@ -237,7 +255,7 @@
                 // Replace loading bubble content with error message
                 loadingBubble.innerHTML = `
                     <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">System Error</p>
-                    <p class="text-red-700">An unexpected error occurred while fetching data. Please check your connection.</p>
+                    <p class="text-red-700">An unexpected error occurred while connecting to the source.</p>
                 `;
             } finally {
                 // Re-enable input
