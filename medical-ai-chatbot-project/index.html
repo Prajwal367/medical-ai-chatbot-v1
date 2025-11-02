@@ -111,7 +111,7 @@
 
     <script>
         // --- CONFIGURATION ---
-        const WIKI_USER_AGENT = 'HealthAssistantApp/1.4 (contact@user-provided-email.com)';
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.5 (contact@user-provided-email.com)';
         const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
         const chatWindow = document.getElementById('chat-window');
         const searchInput = document.getElementById('searchInput');
@@ -121,9 +121,11 @@
         const MEDICAL_KEYWORDS = [
             'disease', 'syndrome', 'disorder', 'condition', 'treatment', 'therapy', 'drug',
             'medicine', 'anatomy', 'physiology', 'surgery', 'virus', 'bacteria', 'fungus',
-            'medical', 'health', 'symptom', 'pain', 'fever', 'headache', 'cold', 'flu', 
-            'cancer', 'diabetes', 'complication', 'nutrition', 'cough', 'vaccine', 'virus',
-            'heart', 'kidney', 'lung', 'infection', 'inflammation' // Added common terms like cough, infection, inflammation
+            'medical', 'health', 'symptom', 'pain', 'cold', 'flu', 
+            'diabetes', 'complication', 'nutrition', 'vaccine', 'virus',
+            'heart', 'kidney', 'lung', 'infection', 'inflammation',
+            // Explicitly include basic terms that often have specific Wikipedia pages
+            'fever', 'cough', 'cancer', 'headache' 
         ];
 
 
@@ -180,28 +182,46 @@
             return false;
         }
 
+        /**
+         * Extracts the main topic keyword from a question or sentence.
+         * Example: "What are the common symptoms of influenza?" -> "influenza"
+         * @param {string} query The raw user input.
+         * @returns {string} The cleaned search term.
+         */
+        function extractSearchTerm(query) {
+            // 1. Convert to lowercase and trim
+            let lowerQuery = query.toLowerCase().trim();
+
+            // 2. Remove common question prefixes and punctuation
+            lowerQuery = lowerQuery
+                .replace(/^(what are the common symptoms of|what is|tell me about|i have|what causes|how do i treat)\s+/i, '')
+                .replace(/[?,.!'"]+/g, '');
+
+            // 3. Return the remaining simplified term
+            return lowerQuery.trim();
+        }
 
         /**
          * Checks if the article title is likely medical based on defined keywords.
+         * We check the title AND the cleaned search term here for better flexibility.
          * @param {string} title The title of the Wikipedia article.
-         * @returns {boolean} True if title contains a strong medical keyword or is highly specific.
+         * @param {string} cleanedQuery The simplified search term (e.g., "influenza").
+         * @returns {boolean} True if the topic is highly likely to be medical.
          */
-        function isMedicalTopic(title) {
+        function isMedicalTopic(title, cleanedQuery) {
             const normalizedTitle = title.toLowerCase();
-            const normalizedKeywords = MEDICAL_KEYWORDS.map(k => k.toLowerCase());
             
-            // Check if any strong medical keyword is in the title
-            const hasKeyword = normalizedKeywords.some(keyword => normalizedTitle.includes(keyword));
+            // Check if the title contains any strong medical keyword
+            const titleContainsMedicalKeyword = MEDICAL_KEYWORDS.some(keyword => normalizedTitle.includes(keyword.toLowerCase()));
 
-            // Also allow specific medical terms/symptoms that might not contain the general keywords
-            // e.g. "Epilepsy", "Migraine", "Asthma"
-            const isSpecificMedicalTerm = [
-                'fever', 'cough', 'cancer', 'headache', 'flu', 'migraine', 'asthma', 'allergy',
-                'epilepsy', 'dementia', 'tuberculosis', 'cholera', 'smallpox', 'polio', 'aids', 'hiv',
-                'pain', 'injury', 'fracture', 'burn', 'trauma'
-            ].some(term => normalizedTitle.toLowerCase() === term || normalizedTitle.toLowerCase().startsWith(term + ' '));
+            // Check if the cleaned search query itself is a basic, recognized medical term 
+            const isBasicMedicalTerm = ['fever', 'cough', 'cancer', 'headache', 'flu', 'diabetes', 'asthma'].includes(cleanedQuery.toLowerCase());
 
-            return hasKeyword || isSpecificMedicalTerm;
+            // Check if the result title is a direct match for the basic term OR
+            // if the title is clearly related to medicine (e.g., "Fred Hutchinson Cancer Center" passes because it contains "cancer").
+            const isHighlyRelevantMatch = titleContainsMedicalKeyword || normalizedTitle.includes(cleanedQuery.toLowerCase()) || isBasicMedicalTerm;
+
+            return isHighlyRelevantMatch;
         }
 
 
@@ -229,8 +249,11 @@
                 return;
             }
 
-            // 4. Start search
-            searchWikipedia(query);
+            // 4. Extract the core search term from the query
+            const searchTerm = extractSearchTerm(query);
+
+            // 5. Start search
+            searchWikipedia(query, searchTerm);
         }
 
         /**
@@ -248,9 +271,10 @@
         
         /**
          * Performs the search against the Wikipedia API and displays the result as an assistant message.
-         * @param {string} query The search term.
+         * @param {string} originalQuery The full user input.
+         * @param {string} searchTerm The simplified term used for the actual search.
          */
-        async function searchWikipedia(query) {
+        async function searchWikipedia(originalQuery, searchTerm) {
             
             // Temporary loading message
             const loadingHtml = `
@@ -259,21 +283,18 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Analyzing search results for medical relevance...</span>
+                    <span>Searching for **"${searchTerm}"**...</span>
                 </div>
             `;
             const loadingBubble = addMessage(loadingHtml, 'assistant');
 
-            // --- IMPROVED SEARCH STRATEGY ---
-            // 1. Search for the exact title first using "intitle" and also include broad medical categories as a fallback.
-            // This is the key fix for accuracy issues like 'Fever' going to 'Complication'.
-            const searchTerms = `intitle:"${query}" OR ${query} category:Health OR category:Medicine OR category:Diseases`;
+            // Search for the exact title first using "intitle" and also include broad medical categories as a fallback.
+            const searchTerms = `intitle:"${searchTerm}" OR ${searchTerm} category:Health OR category:Medicine OR category:Diseases`;
             
-            // NOTE: The Wikipedia API requires 'srsearch' to be the only search term parameter.
             const params = new URLSearchParams({
                 action: 'query',
                 list: 'search',
-                srsearch: searchTerms, // Using the combined search terms
+                srsearch: searchTerms, 
                 srlimit: 1, 
                 srwhat: 'text', 
                 format: 'json',
@@ -281,7 +302,6 @@
             });
 
             try {
-                // The fix: Ensure the URL construction is robust.
                 const apiUrlWithParams = `${WIKI_API_URL}?${params.toString()}`;
 
                 const response = await fetch(apiUrlWithParams, {
@@ -289,12 +309,10 @@
                     headers: { 'Api-User-Agent': WIKI_USER_AGENT }
                 });
 
-                // Check for HTTP errors (e.g., 400, 500)
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                // Check for non-JSON responses (a common cause of the 'unexpected error')
                 const contentType = response.headers.get("content-type");
                 if (!contentType || !contentType.includes("application/json")) {
                     throw new Error("Received non-JSON response from API.");
@@ -302,7 +320,6 @@
 
                 const data = await response.json();
                 
-                // Check for API internal errors (e.g., parsing errors within Wikipedia's system)
                 if (data.error) {
                     throw new Error(`Wikipedia API Error: ${data.error.info}`);
                 }
@@ -314,16 +331,12 @@
                 if (searchResults && searchResults.length > 0) {
                     const result = searchResults[0]; 
                     
-                    // --- STEP 1: STRICT MEDICAL FILTER ---
-                    const normalizedQuery = query.toLowerCase().trim();
-                    const isQueryExactMatch = result.title.toLowerCase() === normalizedQuery || result.title.toLowerCase() === `${normalizedQuery} (medicine)`;
-
-                    // Filter only if it's not an exact match AND doesn't contain a strong medical keyword.
-                    if (!isQueryExactMatch && !isMedicalTopic(result.title)) {
+                    // --- STEP 1: SMART MEDICAL FILTER (Less strict for high-relevance terms) ---
+                    if (!isMedicalTopic(result.title, searchTerm)) {
                          resultHtml = `
                             <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Topic Blocked</p>
                             <p class="font-bold text-lg text-red-700 mb-2">Non-Medical Query Detected</p>
-                            <p class="text-gray-700">The query **"${query}"** did not return a strongly medical or health-related Wikipedia article (found: "${result.title}").</p>
+                            <p class="text-gray-700">The query **"${originalQuery}"** did not return a strongly medical or health-related Wikipedia article (found: "${result.title}").</p>
                             <p class="text-gray-700 mt-2">This Health Assistant is restricted to providing information only on medical and health topics.</p>
                         `;
                     } else {
@@ -343,7 +356,7 @@
                     resultHtml = `
                         <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
                         <p class="font-bold text-lg text-blue-700 mb-2">No Wikipedia Result</p>
-                        <p class="text-gray-700">No specific health article found for your query: **"${query}"**. Please try a different term or simplify your question.</p>
+                        <p class="text-gray-700">No specific health article found for your query: **"${originalQuery}"**. Please try a different term or simplify your question.</p>
                     `;
                 }
                 
@@ -354,7 +367,6 @@
                 console.error('Wikipedia API Error:', error);
                 
                 // Replace loading bubble content with error message
-                // This is the error displayed in your screenshot
                 loadingBubble.innerHTML = `
                     <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">System Error</p>
                     <p class="text-red-700">An unexpected error occurred while connecting to the source. Check the console for details.</p>
