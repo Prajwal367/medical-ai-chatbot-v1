@@ -269,10 +269,11 @@
             // This is the key fix for accuracy issues like 'Fever' going to 'Complication'.
             const searchTerms = `intitle:"${query}" OR ${query} category:Health OR category:Medicine OR category:Diseases`;
             
+            // NOTE: The Wikipedia API requires 'srsearch' to be the only search term parameter.
             const params = new URLSearchParams({
                 action: 'query',
                 list: 'search',
-                srsearch: searchTerms,
+                srsearch: searchTerms, // Using the combined search terms
                 srlimit: 1, 
                 srwhat: 'text', 
                 format: 'json',
@@ -280,17 +281,33 @@
             });
 
             try {
-                const response = await fetch(`${WIKI_API_URL}?${params.toString()}`, {
+                // The fix: Ensure the URL construction is robust.
+                const apiUrlWithParams = `${WIKI_API_URL}?${params.toString()}`;
+
+                const response = await fetch(apiUrlWithParams, {
                     method: 'GET',
                     headers: { 'Api-User-Agent': WIKI_USER_AGENT }
                 });
 
+                // Check for HTTP errors (e.g., 400, 500)
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
+                // Check for non-JSON responses (a common cause of the 'unexpected error')
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new Error("Received non-JSON response from API.");
+                }
+
                 const data = await response.json();
-                const searchResults = data.query.search;
+                
+                // Check for API internal errors (e.g., parsing errors within Wikipedia's system)
+                if (data.error) {
+                    throw new Error(`Wikipedia API Error: ${data.error.info}`);
+                }
+
+                const searchResults = data.query?.search;
                 
                 let resultHtml;
 
@@ -337,6 +354,7 @@
                 console.error('Wikipedia API Error:', error);
                 
                 // Replace loading bubble content with error message
+                // This is the error displayed in your screenshot
                 loadingBubble.innerHTML = `
                     <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">System Error</p>
                     <p class="text-red-700">An unexpected error occurred while connecting to the source. Check the console for details.</p>
