@@ -111,21 +111,23 @@
 
     <script>
         // --- CONFIGURATION ---
-        const WIKI_USER_AGENT = 'HealthAssistantApp/1.5 (contact@user-provided-email.com)';
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.7 (contact@user-provided-email.com)';
         const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
         const chatWindow = document.getElementById('chat-window');
         const searchInput = document.getElementById('searchInput');
         const GREETINGS = ['hi', 'hello', 'hey', 'good morning', 'good afternoon'];
+        // Increased max length for a more detailed, readable paragraph
+        const MAX_SUMMARY_LENGTH = 350; 
         
-        // Keywords that MUST be present in the title for it to be considered medical
+        // Expanded list for better, more accurate medical filtering
         const MEDICAL_KEYWORDS = [
             'disease', 'syndrome', 'disorder', 'condition', 'treatment', 'therapy', 'drug',
             'medicine', 'anatomy', 'physiology', 'surgery', 'virus', 'bacteria', 'fungus',
             'medical', 'health', 'symptom', 'pain', 'cold', 'flu', 
             'diabetes', 'complication', 'nutrition', 'vaccine', 'virus',
             'heart', 'kidney', 'lung', 'infection', 'inflammation',
-            // Explicitly include basic terms that often have specific Wikipedia pages
-            'fever', 'cough', 'cancer', 'headache' 
+            'fever', 'cough', 'cancer', 'headache', 'allergy', 'aneurysm', 'migraine', 
+            'asthma', 'insomnia', 'anxiety', 'depression', 'hypertension', 'stroke'
         ];
 
 
@@ -193,8 +195,9 @@
             let lowerQuery = query.toLowerCase().trim();
 
             // 2. Remove common question prefixes and punctuation
+            // Added 'symptoms of', 'causes of', 'how to treat'
             lowerQuery = lowerQuery
-                .replace(/^(what are the common symptoms of|what is|tell me about|i have|what causes|how do i treat)\s+/i, '')
+                .replace(/^(what are the common symptoms of|what is|tell me about|i have|what causes|how do i treat|symptoms of|causes of|how to treat)\s+/i, '')
                 .replace(/[?,.!'"]+/g, '');
 
             // 3. Return the remaining simplified term
@@ -203,25 +206,71 @@
 
         /**
          * Checks if the article title is likely medical based on defined keywords.
-         * We check the title AND the cleaned search term here for better flexibility.
          * @param {string} title The title of the Wikipedia article.
          * @param {string} cleanedQuery The simplified search term (e.g., "influenza").
          * @returns {boolean} True if the topic is highly likely to be medical.
          */
         function isMedicalTopic(title, cleanedQuery) {
             const normalizedTitle = title.toLowerCase();
+            const normalizedCleanedQuery = cleanedQuery.toLowerCase();
             
-            // Check if the title contains any strong medical keyword
+            // Check if the title contains any strong medical keyword (like 'disease', 'cancer', 'fever')
             const titleContainsMedicalKeyword = MEDICAL_KEYWORDS.some(keyword => normalizedTitle.includes(keyword.toLowerCase()));
 
-            // Check if the cleaned search query itself is a basic, recognized medical term 
-            const isBasicMedicalTerm = ['fever', 'cough', 'cancer', 'headache', 'flu', 'diabetes', 'asthma'].includes(cleanedQuery.toLowerCase());
+            // Check if the cleaned search query itself is one of the recognized medical terms
+            const isBasicMedicalTerm = MEDICAL_KEYWORDS.includes(normalizedCleanedQuery);
 
-            // Check if the result title is a direct match for the basic term OR
-            // if the title is clearly related to medicine (e.g., "Fred Hutchinson Cancer Center" passes because it contains "cancer").
-            const isHighlyRelevantMatch = titleContainsMedicalKeyword || normalizedTitle.includes(cleanedQuery.toLowerCase()) || isBasicMedicalTerm;
+            // The topic passes if:
+            // 1. The title is a direct match or contains the simplified query (e.g., "Fred Hutchinson Cancer Center" contains "cancer").
+            // 2. The title contains one of the generic medical keywords.
+            // 3. The query itself was a basic, recognized medical term.
+            const isHighlyRelevantMatch = normalizedTitle.includes(normalizedCleanedQuery) || titleContainsMedicalKeyword || isBasicMedicalTerm;
 
             return isHighlyRelevantMatch;
+        }
+
+
+        /**
+         * Simplifies and shortens the Wikipedia extract.
+         * @param {string} extract The raw text extract from the API.
+         * @returns {string} The simplified, shortened, plain text summary.
+         */
+        function createSimpleSummary(extract) {
+            // 1. Remove all HTML tags and entities (extracts should be mostly text, but good to be safe)
+            let plainText = extract.replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+
+            // 2. Aggressively remove common introductory Wikipedia phrases/formatting
+            plainText = plainText
+                .replace(/\(.*?\)/g, '') // Remove parenthetical definitions (e.g., (flu))
+                .replace(/^(is a symptom of|is a condition where|is a type of|is an inflammatory process|also known as)/i, '')
+                .trim();
+
+            // 3. Limit length
+            if (plainText.length > MAX_SUMMARY_LENGTH) {
+                // Find the last sentence-ending punctuation before the limit
+                let truncated = plainText.substring(0, MAX_SUMMARY_LENGTH);
+                let lastPunctuation = Math.max(
+                    truncated.lastIndexOf('.'), 
+                    truncated.lastIndexOf('?'), 
+                    truncated.lastIndexOf('!')
+                );
+                
+                if (lastPunctuation !== -1 && lastPunctuation > MAX_SUMMARY_LENGTH * 0.8) {
+                    // If punctuation is near the end, cut there
+                    plainText = truncated.substring(0, lastPunctuation + 1);
+                } else {
+                    // Fallback to word cutoff
+                    let lastSpace = truncated.lastIndexOf(' ');
+                    plainText = (lastSpace !== -1 ? truncated.substring(0, lastSpace) : truncated) + '...';
+                }
+            }
+
+            // 4. Ensure it starts with a capital letter
+            if (plainText.length > 0) {
+                plainText = plainText.charAt(0).toUpperCase() + plainText.slice(1);
+            }
+
+            return plainText;
         }
 
 
@@ -255,22 +304,9 @@
             // 5. Start search
             searchWikipedia(query, searchTerm);
         }
-
-        /**
-         * Cleans the snippet, applying basic filtering and highlighting.
-         * @param {string} snippet The raw HTML snippet from the API.
-         * @returns {string} Cleaned HTML string.
-         */
-        const cleanSnippet = (snippet) => {
-            // Highlight search matches with a prominent color
-            let cleaned = snippet
-                .replace(/<span class="searchmatch">/g, '<strong class="text-teal-700 font-semibold">')
-                .replace(/<\/span>/g, '</strong>');
-            return cleaned;
-        };
         
         /**
-         * Performs the search against the Wikipedia API and displays the result as an assistant message.
+         * Performs the search against the Wikipedia API in two steps: search for title, then fetch extract.
          * @param {string} originalQuery The full user input.
          * @param {string} searchTerm The simplified term used for the actual search.
          */
@@ -283,28 +319,26 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Searching for **"${searchTerm}"**...</span>
+                    <span>Searching Wikipedia for **"${searchTerm}"**...</span>
                 </div>
             `;
             const loadingBubble = addMessage(loadingHtml, 'assistant');
 
-            // Search for the exact title first using "intitle" and also include broad medical categories as a fallback.
+            // --- STEP 1: Search for the best matching article title ---
             const searchTerms = `intitle:"${searchTerm}" OR ${searchTerm} category:Health OR category:Medicine OR category:Diseases`;
             
-            const params = new URLSearchParams({
+            const searchParams = new URLSearchParams({
                 action: 'query',
                 list: 'search',
                 srsearch: searchTerms, 
                 srlimit: 1, 
-                srwhat: 'text', 
                 format: 'json',
                 origin: '*' 
             });
 
             try {
-                const apiUrlWithParams = `${WIKI_API_URL}?${params.toString()}`;
-
-                const response = await fetch(apiUrlWithParams, {
+                const searchUrl = `${WIKI_API_URL}?${searchParams.toString()}`;
+                let response = await fetch(searchUrl, {
                     method: 'GET',
                     headers: { 'Api-User-Agent': WIKI_USER_AGENT }
                 });
@@ -312,18 +346,8 @@
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-
-                const contentType = response.headers.get("content-type");
-                if (!contentType || !contentType.includes("application/json")) {
-                    throw new Error("Received non-JSON response from API.");
-                }
-
-                const data = await response.json();
+                let data = await response.json();
                 
-                if (data.error) {
-                    throw new Error(`Wikipedia API Error: ${data.error.info}`);
-                }
-
                 const searchResults = data.query?.search;
                 
                 let resultHtml;
@@ -331,7 +355,7 @@
                 if (searchResults && searchResults.length > 0) {
                     const result = searchResults[0]; 
                     
-                    // --- STEP 1: SMART MEDICAL FILTER (Less strict for high-relevance terms) ---
+                    // --- STEP 1.1: SMART MEDICAL FILTER ---
                     if (!isMedicalTopic(result.title, searchTerm)) {
                          resultHtml = `
                             <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Topic Blocked</p>
@@ -340,19 +364,51 @@
                             <p class="text-gray-700 mt-2">This Health Assistant is restricted to providing information only on medical and health topics.</p>
                         `;
                     } else {
-                        // --- STEP 2: DISPLAY VALID MEDICAL RESULT ---
-                        const snippetHtml = cleanSnippet(result.snippet);
-                        const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, '_'))}`;
+                        // --- STEP 2: Fetch the full, initial extract of the article ---
+                        const extractParams = new URLSearchParams({
+                            action: 'query',
+                            prop: 'extracts',
+                            titles: result.title,
+                            exintro: true, // Only return the content before the first section
+                            explaintext: true, // Return plain text, not HTML
+                            format: 'json',
+                            origin: '*'
+                        });
 
-                        resultHtml = `
-                            <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
-                            <h4 class="font-bold text-lg text-blue-700 mb-2">Wikipedia Result for "${result.title}"</h4>
-                            <p class="text-gray-700 leading-relaxed">${snippetHtml}</p>
-                            <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">${wikiUrl}</a></p>
-                        `;
+                        const extractUrl = `${WIKI_API_URL}?${extractParams.toString()}`;
+                        response = await fetch(extractUrl, {
+                            method: 'GET',
+                            headers: { 'Api-User-Agent': WIKI_USER_AGENT }
+                        });
+                        data = await response.json();
+
+                        const pages = data.query.pages;
+                        const pageId = Object.keys(pages)[0];
+                        const extract = pages[pageId].extract;
+
+                        if (extract) {
+                             // --- STEP 3: DISPLAY VALID MEDICAL RESULT (Simplified and Longer) ---
+                            const simpleSummary = createSimpleSummary(extract);
+                            const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, '_'))}`;
+
+                            resultHtml = `
+                                <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                                <h4 class="font-bold text-lg text-blue-700 mb-2">Quick Summary for "${result.title}"</h4>
+                                <p class="text-gray-800 leading-relaxed font-medium">${simpleSummary}</p>
+                                <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">Read the full Wikipedia article for more detail</a></p>
+                            `;
+                        } else {
+                            // If extract fails but the title was found
+                            resultHtml = `
+                                <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                                <p class="font-bold text-lg text-red-700 mb-2">Could Not Load Article Details</p>
+                                <p class="text-gray-700">We found the article: **"${result.title}"**, but could not retrieve the text summary. Please try again or click the link below to view it directly.</p>
+                                <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">View Article</a></p>
+                            `;
+                        }
                     }
                 } else {
-                    // --- STEP 3: NO RESULT FOUND ---
+                    // --- STEP 4: NO RESULT FOUND ---
                     resultHtml = `
                         <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
                         <p class="font-bold text-lg text-blue-700 mb-2">No Wikipedia Result</p>
