@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Health AI Assistant</title>
+    <title>Medical Health AI Assistant (Wikipedia)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -105,7 +105,7 @@
     <!-- Header (Fixed at Top) -->
     <header class="app-header primary-blue-bg p-4 text-center">
         <h1 class="text-2xl font-bold text-white">Medical Health AI Assistant</h1>
-        <!-- Disclaimer text changed to YELLOW -->
+        <!-- Disclaimer text is yellow -->
         <p class="text-xs text-yellow-400 font-semibold mt-1">
             ⚠️ Disclaimer: For information only. Consult a healthcare professional.
         </p>
@@ -115,7 +115,7 @@
     <main id="chat-container" class="flex-grow overflow-y-auto space-y-2 p-4 flex flex-col">
         <!-- Initial Welcome Message -->
         <div class="ai-message p-4 max-w-lg shadow-md">
-            <p>Hello! I'm here to provide general information on medical symptoms and conditions. How can I help you today?</p>
+            <p>Hello! I'm here to provide general information on medical symptoms and conditions by searching **Wikipedia**. How can I help you today?</p>
             <p class="text-xs italic text-red-500 mt-2">Remember to seek professional medical advice for any health concerns.</p>
         </div>
         <!-- Messages will be injected here -->
@@ -123,7 +123,7 @@
         <!-- Hidden Loading Indicator for better integration -->
         <div id="loading-indicator" class="ai-message p-3 max-w-xs shadow-md hidden">
             <div class="flex items-center space-x-2">
-                <span class="text-sm">Assistant is typing...</span>
+                <span class="text-sm">Searching Wikipedia...</span>
                 <div class="loading-dot"></div>
                 <div class="loading-dot"></div>
                 <div class="loading-dot"></div>
@@ -148,21 +148,29 @@
 
 
     <script type="module">
-        // Global variables for Firebase configuration are expected to be available in the Canvas environment
-        const apiKey = ""; // API key is handled by the environment
-        const model = 'gemini-2.5-flash-preview-09-2025';
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
         const loadingIndicator = document.getElementById('loading-indicator');
 
-        // --- SYSTEM PROMPT: Includes rules for greetings, scope, and general answers ---
-        const systemPrompt = "You are the **Medical Health AI Assistant**. Your role is strictly limited to providing general information about symptoms, health conditions, diseases, and wellness. Your primary goal is to provide accurate, comprehensive, and clear explanations. **RULE 1 (Greetings):** If the user says 'Hi', 'Hello', 'Hey', or any other simple salutation, you MUST return a polite, friendly greeting immediately (e.g., 'Hello! How can I help you with your health questions today?'). Do not perform a medical search for greetings. **CRITICAL RULE 2 (Scope):** If the user asks a question that is NOT related to health, medicine, symptoms, or the human body (after a greeting or on a non-medical topic), you MUST politely decline and remind them that you are only programmed to answer medical and health-related inquiries. **RULE 3 (Health Questions):** For health questions (including statements like 'I have a fever'): you MUST first provide a **general, broad explanation** of the term, its common types, and potential causes, before discussing specific, narrow diagnoses. Structure your answer clearly using bold text. Always prioritize safety and end your response with a clear, bolded reminder to **consult a healthcare professional for diagnosis and treatment**, as you cannot provide medical advice.";
-        // ------------------------------------
+        // --- Wikipedia API Endpoints ---
+        const CORS_PROXY = 'https://corsproxy.io/?'; 
+        const WIKIPEDIA_SEARCH_URL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srsearch=';
+        const WIKIPEDIA_CONTENT_URL = 'https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info&exintro=true&explaintext=true&format=json&inprop=url&pageids=';
+        // ---------------------------------
+        
+        // --- Conversational Filters for Greeting and Scope ---
+        const GREETINGS = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
+        const NON_MEDICAL_KEYWORDS = ['weather', 'recipe', 'movie', 'book', 'sport', 'capital', 'code', 'stock', 'finance', 'history', 'joke', 'tell me about yourself'];
+        const MEDICAL_KEYWORDS = ['symptom', 'disease', 'condition', 'fever', 'cough', 'pain', 'headache', 'stomach', 'diagnosis', 'treatment', 'medical', 'health', 'injury', 'virus', 'bacteria'];
+        // ----------------------------------------------------
 
-        // Simple utility for displaying messages
+        /**
+         * Displays a message in the chat container.
+         * @param {string} text - The message content.
+         * @param {string} type - 'user' or 'ai'.
+         * @param {Array} sources - Array of source objects {uri, title}.
+         */
         function displayMessage(text, type, sources = []) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `p-4 shadow-md ${type === 'user' ? 'user-message' : 'ai-message'} break-words whitespace-pre-wrap`;
@@ -170,55 +178,39 @@
             if (type === 'user') {
                 messageDiv.textContent = text;
             } else {
-                // Render Markdown content to HTML
                 let htmlContent = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 htmlContent = htmlContent.replace(/\n/g, '<br>');
                 messageDiv.innerHTML = htmlContent;
 
-                // Add sources if available
-                if (sources.length > 0) {
+                if (sources.length > 0 && sources[0].uri && sources[0].title) {
                     const sourcesDiv = document.createElement('div');
                     sourcesDiv.className = 'sources-list mt-3';
-                    sourcesDiv.innerHTML = '<strong>Sources:</strong>';
+                    sourcesDiv.innerHTML = '<strong>Source:</strong>';
                     
-                    sources.forEach((source, index) => {
-                        if (source.uri && source.title) {
-                            const link = document.createElement('a');
-                            link.href = source.uri;
-                            link.target = '_blank';
-                            // Link color adjusted for light mode
-                            link.className = 'source-link hover:text-[#3b82f6] truncate'; 
-                            link.textContent = `${index + 1}. ${source.title}`;
-                            sourcesDiv.appendChild(link);
-                        }
-                    });
+                    const source = sources[0];
+                    const link = document.createElement('a');
+                    link.href = source.uri;
+                    link.target = '_blank';
+                    link.className = 'source-link hover:text-[#3b82f6] truncate'; 
+                    link.textContent = source.title;
+                    sourcesDiv.appendChild(link);
+                    
                     messageDiv.appendChild(sourcesDiv);
                 }
             }
 
             chatContainer.appendChild(messageDiv);
-            // Scroll to bottom
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        async function fetchWithExponentialBackoff(url, options, maxRetries = 5) {
-            for (let attempt = 0; attempt < maxRetries; attempt++) {
-                try {
-                    const response = await fetch(url, options);
-                    if (response.status !== 429 && response.status < 500) {
-                        return response; // Success or non-retryable error
-                    }
-                    if (attempt === maxRetries - 1) {
-                        throw new Error(`API call failed after ${maxRetries} attempts with status ${response.status}`);
-                    }
-                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                } catch (error) {
-                    if (attempt === maxRetries - 1) throw error;
-                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
+        /**
+         * Re-enables input/send controls and hides the loading indicator.
+         */
+        function resetInput() {
+            sendButton.disabled = false;
+            userInput.disabled = false;
+            loadingIndicator.classList.add('hidden');
+            userInput.focus();
         }
 
 
@@ -235,57 +227,76 @@
             userInput.disabled = true;
             loadingIndicator.classList.remove('hidden');
             chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // --- Conversational Filtering Logic ---
+            const normalizedQuery = userQuery.toLowerCase().trim();
+            const words = normalizedQuery.split(/\s+/).filter(word => word.length > 2); // Filter short words like 'a', 'i'
 
-            const payload = {
-                contents: [{ parts: [{ text: userQuery }] }],
-                // Use Google Search for grounded, up-to-date medical information
-                tools: [{ "google_search": {} }], 
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                },
-            };
+            // 1. Check for simple greetings
+            if (words.some(word => GREETINGS.includes(word))) {
+                displayMessage("Hello! I'm here to provide general information on medical symptoms and conditions by searching **Wikipedia**. How can I help you today?", 'ai');
+                resetInput();
+                return;
+            }
 
+            // 2. Check for non-medical topics (Heuristic: contains non-medical keyword AND fewer strong medical keywords)
+            const nonMedicalCount = words.filter(word => NON_MEDICAL_KEYWORDS.includes(word)).length;
+            const medicalCount = words.filter(word => MEDICAL_KEYWORDS.includes(word)).length;
+            
+            if (nonMedicalCount > 0 && medicalCount === 0) {
+                displayMessage("I apologize, but I am programmed to **only answer questions related to health, symptoms, and medical conditions** using Wikipedia. Please ask me a health-related question!", 'ai');
+                resetInput();
+                return;
+            }
+            // --- End Conversational Filtering ---
+
+            // 3. If query passes filters (i.e., it's a medical/symptom query), proceed to Wikipedia search
             try {
-                const response = await fetchWithExponentialBackoff(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
+                // Step 1: Search Wikipedia for the query
+                const searchUrl = `${CORS_PROXY}${encodeURIComponent(WIKIPEDIA_SEARCH_URL)}${encodeURIComponent(userQuery)}&origin=*`;
+                const searchResponse = await fetch(searchUrl);
+                const searchResult = await searchResponse.json();
 
-                let generatedText = "I apologize, but I couldn't retrieve a medical information answer at this time. Please check your network connection and try again.";
-                let sources = [];
-
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    generatedText = candidate.content.parts[0].text;
-                    
-                    // Extract grounding sources
-                    const groundingMetadata = candidate.groundingMetadata;
-                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
-                        sources = groundingMetadata.groundingAttributions
-                            .map(attribution => ({
-                                uri: attribution.web?.uri,
-                                title: attribution.web?.title,
-                            }))
-                            .filter(source => source.uri && source.title);
-                    }
-                } else if (result.error) {
-                     generatedText = `An API error occurred: ${result.error.message}`;
+                const searchHits = searchResult.query?.search || [];
+                if (searchHits.length === 0) {
+                    displayMessage(`I couldn't find a related article for "**${userQuery}**" on Wikipedia. Try a more general medical term.`, 'ai');
+                    return;
                 }
 
-                displayMessage(generatedText, 'ai', sources);
+                const pageId = searchHits[0].pageid;
+                const title = searchHits[0].title;
+
+                // Step 2: Fetch the content extract and URL for the first result
+                const contentUrl = `${CORS_PROXY}${encodeURIComponent(WIKIPEDIA_CONTENT_URL)}${pageId}&redirects=1&origin=*`;
+                const contentResponse = await fetch(contentUrl);
+                const contentResult = await contentResponse.json();
+
+                const pages = contentResult.query?.pages;
+                const pageData = pages ? pages[pageId] : null;
+
+                let generatedText = `Could not load summary for **${title}**.`;
+                let source = null;
+
+                if (pageData && pageData.extract) {
+                    // Wikipedia provides a basic summary (extract)
+                    const extract = pageData.extract.trim();
+                    
+                    // Format the text for display
+                    generatedText = `**Article: ${title}**\n\n${extract}\n\n---\n\nFor a full diagnosis and treatment plan, please **consult a healthcare professional**. The information provided is for informational purposes only.`;
+                    
+                    source = {
+                        uri: pageData.fullurl,
+                        title: pageData.title
+                    };
+                }
+
+                displayMessage(generatedText, 'ai', source ? [source] : []);
 
             } catch (error) {
-                console.error("API Fetch Error:", error);
-                displayMessage("A network or processing error occurred. Please try again.", 'ai');
+                console.error("Wikipedia API Fetch Error:", error);
+                displayMessage("A network or processing error occurred while trying to connect to Wikipedia. Please check your connection.", 'ai');
             } finally {
-                // 3. Re-enable input and hide loading
-                sendButton.disabled = false;
-                userInput.disabled = false;
-                loadingIndicator.classList.add('hidden');
-                userInput.focus();
+                resetInput();
             }
         }
         
