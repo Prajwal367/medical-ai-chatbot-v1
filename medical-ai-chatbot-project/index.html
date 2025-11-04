@@ -31,8 +31,9 @@
 
         /* Chat Window */
         .chat-container { 
+            /* Fixed: Ensuring the scrollable area has enough padding to clear the fixed footer */
             height: calc(100vh - 120px); 
-            padding-bottom: 1rem;
+            padding-bottom: 120px; /* Increased padding to clear the fixed footer (~82px height) */
             background-color: white; /* Chat background is white, as requested */
         }
         
@@ -253,8 +254,17 @@
             // 3. If query passes filters (i.e., it's a medical/symptom query), proceed to Wikipedia search
             try {
                 // Step 1: Search Wikipedia for the query
-                const searchUrl = `${CORS_PROXY}${encodeURIComponent(WIKIPEDIA_SEARCH_URL)}${encodeURIComponent(userQuery)}&origin=*`;
+                // FIX: Correctly encode the target Wikipedia URL for the CORS proxy
+                const wikipediaSearchTargetUrl = `${WIKIPEDIA_SEARCH_URL}${encodeURIComponent(userQuery)}&origin=*`;
+                const searchUrl = `${CORS_PROXY}${encodeURIComponent(wikipediaSearchTargetUrl)}`;
+                
                 const searchResponse = await fetch(searchUrl);
+                
+                // Check for non-200 status codes
+                if (!searchResponse.ok) {
+                    throw new Error(`Wikipedia search failed with status: ${searchResponse.status}`);
+                }
+
                 const searchResult = await searchResponse.json();
 
                 const searchHits = searchResult.query?.search || [];
@@ -267,8 +277,16 @@
                 const title = searchHits[0].title;
 
                 // Step 2: Fetch the content extract and URL for the first result
-                const contentUrl = `${CORS_PROXY}${encodeURIComponent(WIKIPEDIA_CONTENT_URL)}${pageId}&redirects=1&origin=*`;
+                // FIX: Correctly encode the target Wikipedia URL for the CORS proxy
+                const wikipediaContentTargetUrl = `${WIKIPEDIA_CONTENT_URL}${pageId}&redirects=1&origin=*`;
+                const contentUrl = `${CORS_PROXY}${encodeURIComponent(wikipediaContentTargetUrl)}`;
+                
                 const contentResponse = await fetch(contentUrl);
+
+                if (!contentResponse.ok) {
+                    throw new Error(`Wikipedia content fetch failed with status: ${contentResponse.status}`);
+                }
+
                 const contentResult = await contentResponse.json();
 
                 const pages = contentResult.query?.pages;
@@ -294,7 +312,7 @@
 
             } catch (error) {
                 console.error("Wikipedia API Fetch Error:", error);
-                displayMessage("A network or processing error occurred while trying to connect to Wikipedia. Please check your connection.", 'ai');
+                displayMessage("A network or processing error occurred while trying to fetch the information. This is often due to Wikipedia or the CORS proxy being temporarily unavailable. Please try again.", 'ai');
             } finally {
                 resetInput();
             }
