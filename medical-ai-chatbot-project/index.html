@@ -3,327 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Health AI Assistant (Wikipedia)</title>
+    <title>Health Assistant</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* --- LIGHT MODE STYLES (MATCHING SCREENSHOT) --- */
-        
-        /* Primary App Color: Deep Blue for Header */
-        .primary-blue-bg { background-color: #1f4f9f; } 
-        /* Accent Color: Vibrant Cyan-Teal for User Bubbles/Buttons */
-        .accent-color { background-color: #00C2B8; }
-        .accent-color-hover { background-color: #00A395; }
-
-        body { 
-            font-family: 'Inter', sans-serif; 
-            color: #1f2937; /* Dark text for contrast on white background */
-            margin-bottom: 80px; 
-            padding: 0;
-            background-color: white; /* Main body background is white */
-        }
-        
-        /* Fixed Header Style */
-        .app-header {
-            border-bottom: 1px solid #d1d5db; /* Light divider */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* Lighter shadow for light mode */
-        }
-
-        /* Chat Window */
-        .chat-container { 
-            /* Fixed: Ensuring the scrollable area has enough padding to clear the fixed footer */
-            height: calc(100vh - 120px); 
-            padding-bottom: 120px; /* Increased padding to clear the fixed footer (~82px height) */
-            background-color: white; /* Chat background is white, as requested */
-        }
-        
-        /* Chat Bubble Styles */
-        .user-message { 
-            background-color: #00C2B8; /* Vibrant Cyan-Teal for user */ 
-            color: white; 
-            align-self: flex-end; 
-            /* Rounded corners on 3 sides, small pointer corner on bottom-right (user side) */
-            border-radius: 1.25rem 1.25rem 0.2rem 1.25rem; 
-            max-width: 85%;
-            margin-top: 1rem; 
-        }
-        .ai-message { 
-            background-color: #E5E7EB; /* Light Gray for AI bubble */ 
-            color: #1f2937; /* Dark text */
-            align-self: flex-start; 
-            border: 1px solid #D1D5DB; /* Very subtle border */
-            /* Rounded corners on 3 sides, small pointer corner on bottom-left (AI side) */
-            border-radius: 1.25rem 1.25rem 1.25rem 0.2rem;
-            max-width: 85%;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-            margin-top: 1rem; 
-        }
-        .ai-message p { margin-bottom: 0.5rem; }
-        .sources-list { font-size: 0.75rem; color: #4b5563; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #D1D5DB; }
-        .source-link { display: block; margin-bottom: 0.2rem; color: #1f4f9f; } /* Deep Blue link color */
-        .source-link:hover { color: #3b82f6; }
-        
-        /* Loading Indicator - Bright Accent Color */
-        .loading-dot { width: 8px; height: 8px; background-color: #00C2B8; /* Vibrant Cyan-Teal */ border-radius: 50%; display: inline-block; margin: 0 2px; animation: bounce 0.6s infinite alternate; }
-        .loading-dot:nth-child(2) { animation-delay: 0.2s; }
-        .loading-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce {
-            from { transform: translateY(0); }
-            to { transform: translateY(-8px); }
-        }
-
-        /* Input Field Overrides */
-        #user-input {
-            border-radius: 9999px 0 0 9999px; 
-            padding-left: 1.5rem;
-            border-color: #D1D5DB;
-            height: 50px;
-            background-color: white; 
-            color: #1f2937; /* Dark text for input */
-        }
-        #user-input:focus {
-            outline: 2px solid #00C2B8; /* Cyan-Teal focus ring */
-        }
-
-
-        /* Send Button Overrides - Vibrant Cyan-Teal */
-        #send-button {
-            border-radius: 0 9999px 9999px 0; 
-            background-color: #00C2B8; /* Vibrant Cyan-Teal */
-            width: 80px; 
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #send-button:hover {
-             background-color: #00A395; /* Darker hover */
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .app-layout { display: flex; flex-direction: column; min-height: 100vh; height: 100vh; overflow-y: hidden; }
+        #chat-window { flex-grow: 1; overflow-y: auto; padding: 1.5rem; max-width: 1000px; width: 100%; margin: 0 auto; }
+        .user-bubble { background-color: #3b82f6; color: white; border-radius: 1rem 0.5rem 0.5rem 1rem; max-width: 60%; margin-left: auto; }
+        .assistant-bubble { background-color: #eff6ff; color: #1f2937; border-radius: 0.5rem 1rem 1rem 0.5rem; max-width: 75%; margin-right: auto; border: 1px solid #bfdbfe; }
+        header, #input-footer { flex-shrink: 0; }
     </style>
 </head>
-<body class="flex flex-col h-screen main-light-bg">
-
-    <!-- Header (Fixed at Top) -->
-    <header class="app-header primary-blue-bg p-4 text-center">
-        <h1 class="text-2xl font-bold text-white">Medical Health AI Assistant</h1>
-        <!-- Disclaimer text is yellow -->
-        <p class="text-xs text-yellow-400 font-semibold mt-1">
-            ⚠️ Disclaimer: For information only. Consult a healthcare professional.
-        </p>
-    </header>
-
-    <!-- Chat Window (Flex Grow to fill space) -->
-    <main id="chat-container" class="flex-grow overflow-y-auto space-y-2 p-4 flex flex-col">
-        <!-- Initial Welcome Message -->
-        <div class="ai-message p-4 max-w-lg shadow-md">
-            <p>Hello! I'm here to provide general information on medical symptoms and conditions by searching **Wikipedia**. How can I help you today?</p>
-            <p class="text-xs italic text-red-500 mt-2">Remember to seek professional medical advice for any health concerns.</p>
+<body class="bg-gray-100 app-layout">
+    <!-- Header -->
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-center sticky top-0 z-10">
+        <div class="w-full max-w-4xl flex justify-between items-center">
+            <h1 class="text-xl font-bold">HEALTH ASSISTANT</h1>
+            <span class="text-sm font-medium opacity-80">Fact Finder Project</span>
         </div>
-        <!-- Messages will be injected here -->
-        
-        <!-- Hidden Loading Indicator for better integration -->
-        <div id="loading-indicator" class="ai-message p-3 max-w-xs shadow-md hidden">
-            <div class="flex items-center space-x-2">
-                <span class="text-sm">Searching Wikipedia...</span>
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
+    </header>
+    <!-- Warning Disclaimer -->
+    <div class="bg-yellow-100 text-yellow-800 text-sm font-medium p-3 flex justify-center w-full shadow-inner sticky top-16 z-10">
+        <div class="w-full max-w-4xl">
+            <strong class="uppercase mr-2">Mandatory Warning:</strong> This tool uses Wikipedia and is for informational purposes only. It is **NOT** a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified doctor.
+        </div>
+    </div>
+    <!-- Chat Window -->
+    <div id="chat-window" class="space-y-6 pt-6 pb-6">
+        <div class="flex justify-start">
+            <div class="assistant-bubble p-4 shadow-lg">
+                <p class="font-bold text-lg text-blue-800 mb-2">Hello! I am a **Wikipedia Health Assistant**.</p>
+                <p>I can provide quick, sourced summaries from Wikipedia. ***What health topic would you like to search for?***</p>
+                <p class="text-xs mt-2 text-gray-500">Please start by asking a general health question (e.g., "seasonal allergies," "benefits of walking," or "what is an aneurysm?").</p>
             </div>
         </div>
-    </main>
-    
-    <!-- Input Area (Fixed Footer) -->
-    <footer class="fixed bottom-0 left-0 right-0 p-4 main-light-bg shadow-xl flex items-center justify-center border-t border-gray-300">
-        <div class="flex w-full max-w-3xl">
-            <input type="text" id="user-input" placeholder="Ask about a symptom, like 'cough' or 'fever'..."
-                   class="flex-grow p-3 border focus:ring-2 focus:ring-[#00C2B8] focus:border-[#00C2B8] shadow-inner transition duration-150 ease-in-out">
-            <button id="send-button"
-                    class="text-white font-semibold px-4 transition duration-150 ease-in-out shadow-lg disabled:opacity-50"
-                    onclick="sendMessage()">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                    <path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.868.75.75 0 0 0 0-1.213A60.52 60.52 0 0 0 3.478 2.405Z" />
+    </div>
+    <!-- Input Footer -->
+    <div id="input-footer" class="bg-white p-4 border-t border-gray-200 sticky bottom-0 z-20 flex justify-center w-full">
+        <div class="w-full max-w-4xl flex gap-3">
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Search for a health topic..." 
+                class="flex-grow p-3 border-2 border-gray-300 rounded-full focus:ring-blue-500 focus:border-blue-500 transition duration-200 text-base shadow-inner"
+                onkeydown="if(event.key === 'Enter') handleUserInput()"
+            >
+            <button 
+                id="searchButton" 
+                onclick="handleUserInput()" 
+                class="bg-blue-600 text-white w-12 h-12 rounded-full font-bold hover:bg-blue-700 transition duration-200 shadow-xl active:scale-95 transform flex items-center justify-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" transform="rotate(90 12 12) translate(0 0) scale(-1 1)" />
                 </svg>
             </button>
         </div>
-    </footer>
-
-
-    <script type="module">
-        const chatContainer = document.getElementById('chat-container');
-        const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
-        const loadingIndicator = document.getElementById('loading-indicator');
-
-        // --- Wikipedia API Endpoints ---
-        const CORS_PROXY = 'https://corsproxy.io/?'; 
-        const WIKIPEDIA_SEARCH_URL = 'https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srsearch=';
-        const WIKIPEDIA_CONTENT_URL = 'https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info&exintro=true&explaintext=true&format=json&inprop=url&pageids=';
-        // ---------------------------------
-        
-        // --- Conversational Filters for Greeting and Scope ---
-        const GREETINGS = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
-        const NON_MEDICAL_KEYWORDS = ['weather', 'recipe', 'movie', 'book', 'sport', 'capital', 'code', 'stock', 'finance', 'history', 'joke', 'tell me about yourself'];
-        const MEDICAL_KEYWORDS = ['symptom', 'disease', 'condition', 'fever', 'cough', 'pain', 'headache', 'stomach', 'diagnosis', 'treatment', 'medical', 'health', 'injury', 'virus', 'bacteria'];
-        // ----------------------------------------------------
-
-        /**
-         * Displays a message in the chat container.
-         * @param {string} text - The message content.
-         * @param {string} type - 'user' or 'ai'.
-         * @param {Array} sources - Array of source objects {uri, title}.
-         */
-        function displayMessage(text, type, sources = []) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `p-4 shadow-md ${type === 'user' ? 'user-message' : 'ai-message'} break-words whitespace-pre-wrap`;
-
-            if (type === 'user') {
-                messageDiv.textContent = text;
-            } else {
-                let htmlContent = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                htmlContent = htmlContent.replace(/\n/g, '<br>');
-                messageDiv.innerHTML = htmlContent;
-
-                if (sources.length > 0 && sources[0].uri && sources[0].title) {
-                    const sourcesDiv = document.createElement('div');
-                    sourcesDiv.className = 'sources-list mt-3';
-                    sourcesDiv.innerHTML = '<strong>Source:</strong>';
-                    
-                    const source = sources[0];
-                    const link = document.createElement('a');
-                    link.href = source.uri;
-                    link.target = '_blank';
-                    link.className = 'source-link hover:text-[#3b82f6] truncate'; 
-                    link.textContent = source.title;
-                    sourcesDiv.appendChild(link);
-                    
-                    messageDiv.appendChild(sourcesDiv);
+    </div>
+    <script>
+        // --- CONFIGURATION & UTILS (unchanged) ---
+        const WIKI_USER_AGENT = 'HealthAssistantApp/1.8 (user-provided-email.com)'; 
+        const WIKI_API_URL = 'https://en.wikipedia.org/w/api.php';
+        const chatWindow = document.getElementById('chat-window');
+        const searchInput = document.getElementById('searchInput');
+        const GREETINGS = ['hi', 'hello', 'hey', 'good morning', 'good afternoon'];
+        const MAX_SUMMARY_LENGTH = 350; 
+        const MEDICAL_KEYWORDS = [
+            'disease', 'syndrome', 'disorder', 'condition', 'treatment', 'therapy', 'drug',
+            'medicine', 'anatomy', 'physiology', 'surgery', 'virus', 'bacteria', 'fungus',
+            'medical', 'health', 'symptom', 'pain', 'cold', 'flu', 
+            'diabetes', 'complication', 'nutrition', 'vaccine', 'virus',
+            'heart', 'kidney', 'lung', 'infection', 'inflammation',
+            'fever', 'cough', 'cancer', 'headache', 'allergy', 'aneurysm', 'migraine', 
+            'asthma', 'insomnia', 'anxiety', 'depression', 'hypertension', 'stroke',
+            'dermatology', 'cardiology', 'gastroenterology', 'neurology', 'pediatrics'
+        ];
+        function scrollToBottom() { setTimeout(() => { chatWindow.scrollTop = chatWindow.scrollHeight; }, 50); }
+        function addMessage(content, type) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${type === 'user' ? 'justify-end' : 'justify-start'}`;
+            const bubble = document.createElement('div');
+            bubble.className = `${type === 'user' ? 'user-bubble' : 'assistant-bubble'} p-4 shadow-md`;
+            bubble.innerHTML = content;
+            wrapper.appendChild(bubble);
+            chatWindow.appendChild(wrapper);
+            scrollToBottom();
+            return bubble;
+        }
+        function handleGreeting(query) {
+            const normalizedQuery = query.toLowerCase();
+            const isGreeting = GREETINGS.some(greeting => 
+                normalizedQuery === greeting || normalizedQuery.startsWith(greeting + ' ')
+            );
+            if (isGreeting) {
+                const response = `
+                    <p class="font-bold text-lg text-blue-800 mb-2">Hello! How can I assist you with your health query today?</p>
+                    <p class="text-gray-700 leading-relaxed">Remember, I use Wikipedia for information. For example, try asking: "What are the common symptoms of influenza?"</p>
+                `;
+                addMessage(response, 'assistant');
+                return true;
+            }
+            return false;
+        }
+        function extractSearchTerm(query) {
+            let lowerQuery = query.toLowerCase().trim();
+            lowerQuery = lowerQuery
+                .replace(/^(what are the common symptoms of|what is|tell me about|i have|what causes|how do i treat|symptoms of|causes of|how to treat)\s+/i, '')
+                .replace(/[?,.!'"]+/g, '');
+            return lowerQuery.trim();
+        }
+        function isMedicalTopic(title, cleanedQuery) {
+            const normalizedTitle = title.toLowerCase();
+            const normalizedCleanedQuery = cleanedQuery.toLowerCase();
+            const titleContainsMedicalKeyword = MEDICAL_KEYWORDS.some(keyword => normalizedTitle.includes(keyword.toLowerCase()));
+            const isBasicMedicalTerm = MEDICAL_KEYWORDS.includes(normalizedCleanedQuery);
+            const titleContainsQuery = normalizedTitle.includes(normalizedCleanedQuery);
+            // Prevent irrelevant results, like medical centers
+            const blockWords = ["center", "disambiguation"];
+            if (blockWords.some(block => normalizedTitle.includes(block))) return false;
+            return titleContainsQuery || titleContainsMedicalKeyword || isBasicMedicalTerm;
+        }
+        function createSimpleSummary(extract) {
+            let plainText = extract.replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            plainText = plainText
+                .replace(/\(.*?\)/g, '')
+                .replace(/^(is a symptom of|is a condition where|is a type of|is an inflammatory process|also known as)/i, '')
+                .trim();
+            if (plainText.length > MAX_SUMMARY_LENGTH) {
+                let truncated = plainText.substring(0, MAX_SUMMARY_LENGTH);
+                let lastPunctuation = Math.max(truncated.lastIndexOf('.'), truncated.lastIndexOf('?'), truncated.lastIndexOf('!'));
+                if (lastPunctuation !== -1 && lastPunctuation > MAX_SUMMARY_LENGTH * 0.8) {
+                    plainText = truncated.substring(0, lastPunctuation + 1);
+                } else {
+                    let lastSpace = truncated.lastIndexOf(' ');
+                    plainText = (lastSpace !== -1 ? truncated.substring(0, lastSpace) : truncated) + '...';
                 }
             }
-
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (plainText.length > 0) {
+                plainText = plainText.charAt(0).toUpperCase() + plainText.slice(1);
+            }
+            return plainText;
         }
 
-        /**
-         * Re-enables input/send controls and hides the loading indicator.
-         */
-        function resetInput() {
-            sendButton.disabled = false;
-            userInput.disabled = false;
-            loadingIndicator.classList.add('hidden');
-            userInput.focus();
-        }
-
-
-        async function sendMessage() {
-            const userQuery = userInput.value.trim();
-            if (!userQuery) return;
-
-            // 1. Display user message
-            displayMessage(userQuery, 'user');
-            userInput.value = '';
-            
-            // 2. Disable input and show loading
-            sendButton.disabled = true;
-            userInput.disabled = true;
-            loadingIndicator.classList.remove('hidden');
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            
-            // --- Conversational Filtering Logic ---
-            const normalizedQuery = userQuery.toLowerCase().trim();
-            const words = normalizedQuery.split(/\s+/).filter(word => word.length > 2); // Filter short words like 'a', 'i'
-
-            // 1. Check for simple greetings
-            if (words.some(word => GREETINGS.includes(word))) {
-                displayMessage("Hello! I'm here to provide general information on medical symptoms and conditions by searching **Wikipedia**. How can I help you today?", 'ai');
-                resetInput();
-                return;
-            }
-
-            // 2. Check for non-medical topics (Heuristic: contains non-medical keyword AND fewer strong medical keywords)
-            const nonMedicalCount = words.filter(word => NON_MEDICAL_KEYWORDS.includes(word)).length;
-            const medicalCount = words.filter(word => MEDICAL_KEYWORDS.includes(word)).length;
-            
-            if (nonMedicalCount > 0 && medicalCount === 0) {
-                displayMessage("I apologize, but I am programmed to **only answer questions related to health, symptoms, and medical conditions** using Wikipedia. Please ask me a health-related question!", 'ai');
-                resetInput();
-                return;
-            }
-            // --- End Conversational Filtering ---
-
-            // 3. If query passes filters (i.e., it's a medical/symptom query), proceed to Wikipedia search
+        // ------------ MAIN LOGIC CHANGE (only the searchWikipedia function) -------------
+        async function searchWikipedia(originalQuery, searchTerm) {
+            const loadingHtml = `
+                <div class="flex items-center space-x-2 text-gray-500">
+                    <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Searching Wikipedia for <strong>${searchTerm}</strong>...</span>
+                </div>
+            `;
+            const loadingBubble = addMessage(loadingHtml, 'assistant');
             try {
-                // Step 1: Search Wikipedia for the query
-                // FIX: Correctly encode the target Wikipedia URL for the CORS proxy
-                const wikipediaSearchTargetUrl = `${WIKIPEDIA_SEARCH_URL}${encodeURIComponent(userQuery)}&origin=*`;
-                const searchUrl = `${CORS_PROXY}${encodeURIComponent(wikipediaSearchTargetUrl)}`;
-                
-                const searchResponse = await fetch(searchUrl);
-                
-                // Check for non-200 status codes
-                if (!searchResponse.ok) {
-                    throw new Error(`Wikipedia search failed with status: ${searchResponse.status}`);
-                }
+                // 1. Try exact title match first
+                let titleParams = new URLSearchParams({
+                    action: 'query',
+                    prop: 'extracts',
+                    titles: searchTerm,
+                    exintro: true,
+                    explaintext: true,
+                    format: 'json',
+                    origin: '*'
+                });
+                let titleUrl = `${WIKI_API_URL}?${titleParams.toString()}`;
+                let titleResponse = await fetch(titleUrl, {
+                    method: 'GET',
+                    headers: { 'Api-User-Agent': WIKI_USER_AGENT }
+                });
+                let titleData = await titleResponse.json();
+                let pages = titleData.query.pages;
+                let pageKey = Object.keys(pages)[0];
+                let directExtract = pages[pageKey]?.extract;
+                let directTitle = pages[pageKey]?.title;
 
-                const searchResult = await searchResponse.json();
-
-                const searchHits = searchResult.query?.search || [];
-                if (searchHits.length === 0) {
-                    displayMessage(`I couldn't find a related article for "**${userQuery}**" on Wikipedia. Try a more general medical term.`, 'ai');
+                if (directExtract && isMedicalTopic(directTitle || '', searchTerm)) {
+                    const simpleSummary = createSimpleSummary(directExtract);
+                    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(directTitle.replace(/ /g, '_'))}`;
+                    loadingBubble.innerHTML = `
+                        <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                        <h4 class="font-bold text-lg text-blue-700 mb-2">Quick Summary for "${directTitle}"</h4>
+                        <p class="text-gray-800 leading-relaxed font-medium">${simpleSummary}</p>
+                        <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">Read the full Wikipedia article for more detail</a></p>
+                    `;
                     return;
                 }
 
-                const pageId = searchHits[0].pageid;
-                const title = searchHits[0].title;
+                // 2. Fallback to Wikipedia search API if no exact match
+                const searchParams = new URLSearchParams({
+                    action: 'query',
+                    list: 'search',
+                    srsearch: `"${searchTerm}" category:Medicine OR category:Health`,
+                    srlimit: 2,
+                    format: 'json',
+                    origin: '*'
+                });
+                const searchUrl = `${WIKI_API_URL}?${searchParams.toString()}`;
+                let searchResponse = await fetch(searchUrl, {
+                    method: 'GET',
+                    headers: { 'Api-User-Agent': WIKI_USER_AGENT }
+                });
+                let searchData = await searchResponse.json();
+                const searchResults = searchData.query?.search;
 
-                // Step 2: Fetch the content extract and URL for the first result
-                // FIX: Correctly encode the target Wikipedia URL for the CORS proxy
-                const wikipediaContentTargetUrl = `${WIKIPEDIA_CONTENT_URL}${pageId}&redirects=1&origin=*`;
-                const contentUrl = `${CORS_PROXY}${encodeURIComponent(wikipediaContentTargetUrl)}`;
-                
-                const contentResponse = await fetch(contentUrl);
-
-                if (!contentResponse.ok) {
-                    throw new Error(`Wikipedia content fetch failed with status: ${contentResponse.status}`);
+                let foundResult = null;
+                if (searchResults && searchResults.length > 0) {
+                    foundResult = searchResults.find(r => isMedicalTopic(r.title, searchTerm));
                 }
-
-                const contentResult = await contentResponse.json();
-
-                const pages = contentResult.query?.pages;
-                const pageData = pages ? pages[pageId] : null;
-
-                let generatedText = `Could not load summary for **${title}**.`;
-                let source = null;
-
-                if (pageData && pageData.extract) {
-                    // Wikipedia provides a basic summary (extract)
-                    const extract = pageData.extract.trim();
-                    
-                    // Format the text for display
-                    generatedText = `**Article: ${title}**\n\n${extract}\n\n---\n\nFor a full diagnosis and treatment plan, please **consult a healthcare professional**. The information provided is for informational purposes only.`;
-                    
-                    source = {
-                        uri: pageData.fullurl,
-                        title: pageData.title
-                    };
+                if (foundResult) {
+                    const extractParams = new URLSearchParams({
+                        action: 'query',
+                        prop: 'extracts',
+                        titles: foundResult.title,
+                        exintro: true,
+                        explaintext: true,
+                        format: 'json',
+                        origin: '*'
+                    });
+                    const extractUrl = `${WIKI_API_URL}?${extractParams.toString()}`;
+                    let extractResponse = await fetch(extractUrl, {
+                        method: 'GET',
+                        headers: { 'Api-User-Agent': WIKI_USER_AGENT }
+                    });
+                    let extractData = await extractResponse.json();
+                    const pages = extractData.query.pages;
+                    const pageId = Object.keys(pages)[0];
+                    const extract = pages[pageId]?.extract;
+                    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(foundResult.title.replace(/ /g, '_'))}`;
+                    if (extract) {
+                        const simpleSummary = createSimpleSummary(extract);
+                        loadingBubble.innerHTML = `
+                            <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                            <h4 class="font-bold text-lg text-blue-700 mb-2">Quick Summary for "${foundResult.title}"</h4>
+                            <p class="text-gray-800 leading-relaxed font-medium">${simpleSummary}</p>
+                            <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">Read the full Wikipedia article for more detail</a></p>
+                        `;
+                    } else {
+                        loadingBubble.innerHTML = `
+                            <p class="font-bold text-lg text-red-700 mb-2">Could Not Load Article Details</p>
+                            <p class="text-gray-700">We found the article: <strong>${foundResult.title}</strong>, but could not retrieve its text summary.</p>
+                            <p class="mt-3 text-xs">Source: <a href="${wikiUrl}" target="_blank" class="text-teal-600 hover:underline">View Article</a></p>
+                        `;
+                    }
+                } else {
+                    loadingBubble.innerHTML = `
+                        <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">Disclaimer: I am a fact-finding assistant, not a doctor.</p>
+                        <p class="font-bold text-lg text-blue-700 mb-2">No Wikipedia Result</p>
+                        <p class="text-gray-700">No specific health article found for your query: <strong>${originalQuery}</strong>. Please try a different term or simplify your question.</p>
+                    `;
                 }
-
-                displayMessage(generatedText, 'ai', source ? [source] : []);
-
             } catch (error) {
-                console.error("Wikipedia API Fetch Error:", error);
-                displayMessage("A network or processing error occurred while trying to fetch the information. This is often due to Wikipedia or the CORS proxy being temporarily unavailable. Please try again.", 'ai');
+                console.error('Wikipedia API Error:', error);
+                loadingBubble.innerHTML = `
+                    <p class="text-sm font-semibold text-red-500 border-b border-red-200 pb-2 mb-2">System Error</p>
+                    <p class="text-red-700">An unexpected error occurred while searching Wikipedia. Please try again.</p>
+                `;
             } finally {
-                resetInput();
+                searchInput.disabled = false;
+                document.getElementById('searchButton').disabled = false;
+                searchInput.focus();
+                scrollToBottom();
             }
         }
-        
-        // Allow sending message with Enter key
-        userInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
+
+        // ---------------- REST OF YOUR CODE IS UNCHANGED -----------------
+        function handleUserInput() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+            addMessage(query, 'user');
+            searchInput.value = '';
+            searchInput.disabled = true;
+            document.getElementById('searchButton').disabled = true;
+            if (handleGreeting(query)) {
+                searchInput.disabled = false;
+                document.getElementById('searchButton').disabled = false;
+                searchInput.focus();
+                return;
             }
-        });
+            const searchTerm = extractSearchTerm(query);
+            searchWikipedia(query, searchTerm);
+        }
     </script>
 </body>
 </html>
